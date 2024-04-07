@@ -2,7 +2,10 @@ package bridge.mvn;
 
 import bridge.asm.HierarchyScanner;
 import bridge.asm.TypeMap;
-import org.objectweb.asm.*;
+import org.objectweb.asm.AnnotationVisitor;
+import org.objectweb.asm.FieldVisitor;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Type;
 
 import java.util.Arrays;
 import java.util.Iterator;

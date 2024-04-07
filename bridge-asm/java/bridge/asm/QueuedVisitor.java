@@ -14,8 +14,8 @@ public class QueuedVisitor extends MethodVisitor {
         super(api);
     }
 
-    protected QueuedVisitor(int api, MethodVisitor parent) {
-        super(api, parent);
+    protected QueuedVisitor(int api, MethodVisitor delegate) {
+        super(api, delegate);
     }
 
     public void queue(Runnable op) {

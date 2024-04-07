@@ -1,5 +1,6 @@
 package bridge.mvn;
 
+import bridge.asm.Linked;
 import bridge.asm.QueuedVisitor;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Label;
@@ -24,8 +25,8 @@ public final class ForkVisitor extends ClassVisitor {
     private final boolean names, lines;
     private final int version, flags;
 
-    ForkVisitor(ClassVisitor parent, BridgeVisitor caller, int version, int flags) {
-        super(ASM9, parent);
+    ForkVisitor(ClassVisitor delegate, BridgeVisitor caller, int version, int flags) {
+        super(ASM9, delegate);
         this.caller = caller;
         this.version = version;
         this.flags = flags;
@@ -51,13 +52,29 @@ public final class ForkVisitor extends ClassVisitor {
         return new Fork(name, new Clean(super.visitMethod(access, name, descriptor, signature, exceptions)));
     }
 
-    private final class Fork extends MethodVisitor {
+    private final class Fork extends MethodVisitor implements Linked<MethodVisitor> {
         private final String method;
         private int line;
 
-        private Fork(String name, MethodVisitor parent) {
-            super(ASM9, parent);
+        private Fork(String name, MethodVisitor delegate) {
+            super(ASM9, delegate);
             this.method = name;
+        }
+
+        @Override
+        public <T extends MethodVisitor> T setDelegate(T value) {
+            mv = value;
+            return value;
+        }
+
+        @Override
+        public MethodVisitor getParent() {
+            return null;
+        }
+
+        @Override
+        public <T extends MethodVisitor> T setParent(T value) {
+            return value;
         }
 
         @Override
@@ -66,7 +83,7 @@ public final class ForkVisitor extends ClassVisitor {
         }
 
         private RuntimeException exception(String message) {
-            StringBuilder str = new StringBuilder(message).append(": at ")
+            StringBuilder str = new StringBuilder().append(message).append(": at ")
                     .append(caller.name.replace('/', '.')).append('.').append(method)
                     .append('(').append(caller.src);
             if (line != 0) str.append(':').append(line);
@@ -91,8 +108,34 @@ public final class ForkVisitor extends ClassVisitor {
         @Override
         public void visitFieldInsn(int opcode, String owner, String name, String descriptor) {
             if (opcode == GETSTATIC && "bridge/Invocation".equals(owner) && name.equals("LANGUAGE_LEVEL")) {
-                mv = new MethodVisitor(ASM9, mv) {
+                final class LANGUAGE_LEVEL extends MethodVisitor implements Linked<MethodVisitor> {
+                    private MethodVisitor parent;
                     private int version;
+
+                    @SuppressWarnings("unchecked")
+                    private LANGUAGE_LEVEL(MethodVisitor delegate) {
+                        super(ASM9, delegate);
+                        if (delegate instanceof Linked) {
+                            ((Linked<MethodVisitor>) delegate).setParent(this);
+                        }
+                    }
+
+                    @Override
+                    public <T extends MethodVisitor> T setDelegate(T value) {
+                        mv = value;
+                        return value;
+                    }
+
+                    @Override
+                    public MethodVisitor getParent() {
+                        return parent;
+                    }
+
+                    @Override
+                    public <T extends MethodVisitor> T setParent(T value) {
+                        parent = value;
+                        return value;
+                    }
 
                     @Override
                     public void visitIntInsn(int opcode, int operand) {
@@ -112,6 +155,7 @@ public final class ForkVisitor extends ClassVisitor {
                         }
                     }
 
+                    @SuppressWarnings("unchecked")
                     @Override
                     public void visitJumpInsn(int opcode, Label label) {
                         switch (opcode) {
@@ -137,7 +181,9 @@ public final class ForkVisitor extends ClassVisitor {
                                 super.visitJumpInsn(opcode, label);
                                 return;
                         }
-                        Fork.this.mv = mv;
+                        if (((Linked<MethodVisitor>) parent).setDelegate(mv) instanceof Linked) {
+                            ((Linked<MethodVisitor>) mv).setParent(parent);
+                        }
                     }
 
                     @Override
@@ -146,7 +192,8 @@ public final class ForkVisitor extends ClassVisitor {
                     public void visitEnd() {
                         throw exception("Method ended despite incomplete fork operation");
                     }
-                };
+                }
+                setDelegate(new LANGUAGE_LEVEL(mv)).setParent(this);
             } else {
                 super.visitFieldInsn(opcode, owner, name, descriptor);
             }
@@ -216,8 +263,8 @@ public final class ForkVisitor extends ClassVisitor {
             }
         }
 
-        private Clean(MethodVisitor parent) {
-            super(ASM9, parent);
+        private Clean(MethodVisitor delegate) {
+            super(ASM9, delegate);
             blocks.add(this.block = new Block());
             block.ops = ops;
         }

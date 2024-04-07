@@ -19,9 +19,10 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.tree.ClassNode;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Locale;
@@ -122,7 +123,7 @@ public final class BridgeMojo extends AbstractMojo {
                 if (file.exists()) {
                     if (log.isDebugEnabled()) log.debug(" + " + file);
                     unique.add(path.replace(File.separatorChar, '/'));
-                    try (FileInputStream fis = new FileInputStream(file)) {
+                    try (InputStream fis = Files.newInputStream(file.toPath())) {
                         new ClassReader(fis).accept(new BridgeScanner(types), ClassReader.SKIP_CODE | ClassReader.SKIP_FRAMES | ClassReader.SKIP_DEBUG);
                     }
                 }
@@ -132,7 +133,7 @@ public final class BridgeMojo extends AbstractMojo {
                 File file = artifact.getFile();
                 if (file.getName().endsWith(".jar") && file.exists()) {
                     log.info("  + " + file + " (" + artifact.getScope() + ')');
-                    try (ZipInputStream zis = new ZipInputStream(new FileInputStream(file))) {
+                    try (ZipInputStream zis = new ZipInputStream(Files.newInputStream(file.toPath()))) {
                         for (ZipEntry entry; (entry = zis.getNextEntry()) != null;) {
                             if (entry.getName().endsWith(".class") && unique.add(entry.getName())) {
                                 new ClassReader(zis).accept(new HierarchyScanner(types), ClassReader.SKIP_CODE | ClassReader.SKIP_FRAMES | ClassReader.SKIP_DEBUG);
@@ -156,14 +157,14 @@ public final class BridgeMojo extends AbstractMojo {
                 if (in.exists()) {
                     path = path.replace(File.separatorChar, '/');
                     if (log.isDebugEnabled()) log.debug("<- " + path);
-                    try (FileInputStream is = new FileInputStream(in)) {
+                    try (InputStream is = Files.newInputStream(in.toPath())) {
                         ClassNode code;
                         BridgeVisitor visitor;
                         new ClassReader(is).accept(visitor = new BridgeVisitor(code = new ClassNode(), types), ClassReader.EXPAND_FRAMES);
                         is.close();
                         int i;
                         if (visitor.bridges != 0 || visitor.invocations != 0 || visitor.adjustments != 0 || visitor.forks.size() != 1) {
-                            StringBuilder msg = new StringBuilder(" -> ").append(
+                            StringBuilder msg = new StringBuilder().append(" -> ").append(
                                     ((i = path.lastIndexOf(visitor.name)) != -1 && path.indexOf('/', i + visitor.name.length()) == -1)?
                                             path.substring(0, i) + visitor.name.replace('/', '.') : path
                             );
@@ -183,7 +184,7 @@ public final class BridgeMojo extends AbstractMojo {
                                     flags
                             ));
                             (out = ((e.getValue())? new File(classpath, "META-INF/versions/" + i + "/" + visitor.name + ".class") : in)).getParentFile().mkdirs();
-                            try (FileOutputStream os = new FileOutputStream(out)) {
+                            try (OutputStream os = Files.newOutputStream(out.toPath())) {
                                 os.write(writer.toByteArray());
                             }
                         }

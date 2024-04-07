@@ -2,8 +2,9 @@ package bridge;
 
 /**
  * A class for creating labels with persistent identifiers
- * @see Jump Teleport to a persistent label in the same method with <code>Jump</code>
+ *
  * @implNote The constructor for this class does not actually construct anything &ndash; so, the imaginary object must be immediately disposed of for your code to compile correctly.
+ * @see Jump Teleport to a persistent label in the same method with <code>Jump</code>
  */
 public final class Label {
 

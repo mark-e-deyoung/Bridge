@@ -10,8 +10,8 @@ public abstract class OperationVisitor extends MethodVisitor {
         super(api);
     }
 
-    protected OperationVisitor(int api, MethodVisitor parent) {
-        super(api, parent);
+    protected OperationVisitor(int api, MethodVisitor delegate) {
+        super(api, delegate);
     }
 
     public abstract void visitOperation(int opcode);

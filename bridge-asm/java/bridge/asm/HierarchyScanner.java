@@ -18,16 +18,16 @@ public class HierarchyScanner extends ClassVisitor {
         this(Opcodes.ASM9, null, types);
     }
 
-    public HierarchyScanner(ClassVisitor parent, TypeMap types) {
-        this(Opcodes.ASM9, parent, types);
+    public HierarchyScanner(ClassVisitor delegate, TypeMap types) {
+        this(Opcodes.ASM9, delegate, types);
     }
 
     protected HierarchyScanner(int api, TypeMap types) {
         this(api, null, types);
     }
 
-    protected HierarchyScanner(int api, ClassVisitor parent, TypeMap types) {
-        super(api, parent);
+    protected HierarchyScanner(int api, ClassVisitor delegate, TypeMap types) {
+        super(api, delegate);
         this.types = Objects.requireNonNull(types);
     }
 

@@ -23,8 +23,8 @@ final class BridgeVisitor extends ClassVisitor {
     String adopt, name, src = "Unknown Source";
     int version, bridges, invocations, adjustments;
 
-    BridgeVisitor(ClassVisitor parent, TypeMap types) {
-        super(ASM9, parent);
+    BridgeVisitor(ClassVisitor delegate, TypeMap types) {
+        super(ASM9, delegate);
         this.types = types;
     }
 

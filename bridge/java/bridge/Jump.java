@@ -2,6 +2,7 @@ package bridge;
 
 /**
  * A class for teleporting to persistent labels
+ *
  * @implNote The constructor for this class does not actually construct anything &ndash; so, the imaginary object must be immediately thrown for your code to compile correctly.
  */
 public final class Jump extends RuntimeException {

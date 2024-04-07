@@ -2,6 +2,7 @@ package bridge;
 
 /**
  * A class that can be used to access field &amp; method bridges (and other things too)
+ *
  * @implNote Imaginary objects defined within and returned by this class may not be stored. In other words, you are required to use them in the same statement they were created in for your code to compile correctly.
  */
 @SuppressWarnings("InnerClassMayBeStatic")

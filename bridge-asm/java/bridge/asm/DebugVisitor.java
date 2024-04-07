@@ -21,8 +21,8 @@ public final class DebugVisitor extends MethodVisitor {
         this(output, owner, name, descriptor, null);
     }
 
-    public DebugVisitor(PrintStream output, String owner, String name, String descriptor, MethodVisitor parent) {
-        super(ASM9, parent);
+    public DebugVisitor(PrintStream output, String owner, String name, String descriptor, MethodVisitor delegate) {
+        super(ASM9, delegate);
         this.out = output;
         out.print(owner);
         out.print('.');
@@ -46,8 +46,8 @@ public final class DebugVisitor extends MethodVisitor {
         merging = false;
         out.println();
         final StringBuilder result = (opcode >= 0)?
-                new StringBuilder("    0x").append(Integer.toHexString(opcode)) :
-                new StringBuilder("     ").append(opcode);
+                new StringBuilder().append("    0x").append(Integer.toHexString(opcode)) :
+                new StringBuilder().append("     ").append(opcode);
         while (result.length() < 8) result.append(' ');
         out.print(result);
     }

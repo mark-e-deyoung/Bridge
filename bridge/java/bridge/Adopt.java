@@ -12,7 +12,7 @@ public @interface Adopt {
     /**
      * Removes existing class metadata when <code>true</code>
      *
-     * @return Clean Status
+     * @return Clean status
      */
     boolean clean() default false;
 
@@ -20,21 +20,21 @@ public @interface Adopt {
      * Overwrites the <code>extends</code> clause
      *
      * @implNote Compatible super constructor(s) must exist within the specified class for them to be usable
-     * @return Parent Class
+     * @return Parent class
      */
     Class<?> parent() default Bridges.class;
 
     /**
      * Appends to the <code>implements</code> clause
      *
-     * @return Parent Interfaces
+     * @return Parent interfaces
      */
     Class<?>[] interfaces() default {};
 
     /**
      * Adds generic type data to the class definition
      *
-     * @return Signature String
+     * @return Signature string
      */
     String signature() default "";
 }

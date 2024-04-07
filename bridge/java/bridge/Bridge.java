@@ -60,7 +60,7 @@ public @interface Bridge {
      * Specifies different access modifiers
      *
      * @implNote Specify an inverted (negative) value to remove existing modifiers using bit-masking
-     * @return Access Modifiers
+     * @return Access modifiers
      */
     int access() default 0xFFFFFFFF;
 
@@ -82,49 +82,49 @@ public @interface Bridge {
     /**
      * Specifies when to start loading arguments from the bridge method
      *
-     * @return From Index
+     * @return From index
      */
     int fromIndex() default 0;
 
     /**
      * Specifies when to start inserting arguments into the @annotated method
      *
-     * @return To Index
+     * @return To index
      */
     int toIndex() default 0;
 
     /**
      * Specifies how many parameters from the bridge method to send to the @annotated method
      *
-     * @return Parameter Amount
+     * @return Parameter amount
      */
     int length() default Integer.MAX_VALUE;
 
     /**
      * Specifies different checked exceptions
      *
-     * @return Checked Exception List
+     * @return Checked exception list
      */
     Class<? extends Throwable>[] exceptions() default Unchecked.class;
 
     /**
      * Specifies generic type data
      *
-     * @return Signature String
+     * @return Signature string
      */
     String signature() default "";
 
     /**
      * Specifies a different field/return type
      *
-     * @return Return Type
+     * @return Return type
      */
     Class<?> returns() default Bridges.class;
 
     /**
      * Specifies that this bridge is <code>@Deprecated</code>
      *
-     * @return Deprecation Status
+     * @return Deprecation status
      */
     Deprecated status() default @Deprecated;
 }

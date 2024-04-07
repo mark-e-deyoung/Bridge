@@ -50,7 +50,7 @@ final class BridgeAnnotation extends AnnotationVisitor {
         } else if ("returns".equals(name)) {
             String desc = $desc, returns = value.toString();
             $returns = Type.getType(returns);
-            $desc = new StringBuilder(desc).replace(desc.indexOf(')') + 1, desc.length(), returns).toString();
+            $desc = new StringBuilder().append(desc).replace(desc.indexOf(')') + 1, desc.length(), returns).toString();
         }
     }
 
