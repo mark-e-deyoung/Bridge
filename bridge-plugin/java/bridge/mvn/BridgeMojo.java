@@ -3,63 +3,144 @@ package bridge.mvn;
 import bridge.asm.HierarchicalWriter;
 import bridge.asm.HierarchyScanner;
 import bridge.asm.TypeMap;
+import org.apache.maven.RepositoryUtils;
 import org.apache.maven.artifact.Artifact;
+import org.apache.maven.artifact.handler.manager.ArtifactHandlerManager;
+import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.AbstractMojo;
+import org.apache.maven.plugin.MojoExecution;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugin.logging.Log;
-import org.apache.maven.plugins.annotations.LifecyclePhase;
-import org.apache.maven.plugins.annotations.Mojo;
-import org.apache.maven.plugins.annotations.Parameter;
-import org.apache.maven.plugins.annotations.ResolutionScope;
+import org.apache.maven.plugins.annotations.*;
 import org.apache.maven.project.MavenProject;
 import org.codehaus.plexus.util.DirectoryScanner;
+import org.eclipse.aether.RepositorySystem;
+import org.eclipse.aether.collection.CollectRequest;
+import org.eclipse.aether.resolution.ArtifactResult;
+import org.eclipse.aether.resolution.DependencyRequest;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.tree.ClassNode;
 
 import java.io.File;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.time.Instant;
-import java.util.HashSet;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import static bridge.mvn.ForkVisitor.*;
 
-@Mojo(name = "bridge", defaultPhase = LifecyclePhase.PROCESS_CLASSES, requiresDependencyResolution = ResolutionScope.COMPILE, requiresDependencyCollection = ResolutionScope.COMPILE)
+/**
+ * Compiles bridge features in application classes
+ */
+@Mojo(
+        name = "bridge",
+        defaultPhase = LifecyclePhase.PROCESS_CLASSES,
+        requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME,
+        requiresDependencyCollection = ResolutionScope.COMPILE_PLUS_RUNTIME,
+        threadSafe = true
+)
 public final class BridgeMojo extends AbstractMojo {
 
-    @Parameter(defaultValue = "${project}", readonly = true)
+    /**
+     * The maven repository system
+     */
+    @Component
+    private RepositorySystem system;
+
+    /**
+     * The maven artifact manager
+     */
+    @Component
+    private ArtifactHandlerManager manager;
+
+    /**
+     * The maven session
+     */
+    @Component
+    private MavenSession session;
+
+    /**
+     * The maven project
+     */
+    @Component
     private MavenProject project;
 
-    @Parameter(alias = "classpath", property = "bridge.classpath", defaultValue = "${project.build.outputDirectory}")
+    /**
+     * The maven plugin execution
+     */
+    @Component
+    private MojoExecution execution;
+
+    /**
+     * Additional dependencies to add to the class hierarchy
+     */
+    @Parameter(property = "bridge.dependencies")
+    private Dependency[] dependencies;
+
+    /**
+     * The top level input/output directory for classes
+     */
+    @Parameter(property = "bridge.classpath", defaultValue = "${project.build.outputDirectory}")
     private File classpath;
 
-    @Parameter(alias = "includes", property = "bridge.includes", defaultValue = "**/*.class")
+    /**
+     * Include filters to apply when searching for classes to recompile
+     */
+    @Parameter(property = "bridge.includes", defaultValue = "**/*.class")
     private String[] includes;
 
-    @Parameter(alias = "excludes", property = "bridge.excludes")
+    /**
+     * Exclude filters to apply when searching for classes to recompile
+     */
+    @Parameter(property = "bridge.excludes")
     private String[] excludes;
 
-    @Parameter(alias = "flags", property = "bridge.flags")
+    /**
+     * Flags to apply when recompiling classes
+     */
+    @Parameter(property = "bridge.flags")
     private String[] flags;
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         Log log = getLog();
+        check: {
+            String v1, v2 = project.getProperties().getProperty("bridge.version");
+            for (Artifact artifact : project.getArtifacts()) {
+                if (!"net.ME1312.ASM".equalsIgnoreCase(artifact.getGroupId()) ||
+                        !"bridge".equalsIgnoreCase(artifact.getArtifactId()) ||
+                        !"jar".equalsIgnoreCase(artifact.getType()) ||
+                        artifact.getClassifier() != null) continue;
+                if (v2 != null) {
+                    if (!v2.equalsIgnoreCase(v1 = artifact.getVersion())) {
+                        log.warn("The api version differs from ${bridge.version}: " + v1 + " != " + v2);
+                    }
+                    break;
+                }
+                if (((v1 = execution.getVersion()) != (v2 = artifact.getVersion())) && (v1 == null || !v1.equalsIgnoreCase(v2))) {
+                    log.warn("The plugin version differs from the api version: " + v1 + " != " + v2);
+                }
+                break check;
+            }
+            if (v2 != null && !v2.equalsIgnoreCase(v1 = execution.getVersion())) {
+                log.warn("The plugin version differs from ${bridge.version}: " + v1 + " != " + v2);
+            }
+        }
         int flags = 0;
         boolean lazy = true;
         for (String flag : this.flags) {
             switch (flag.replaceAll("[\\s\\-]", "_").toUpperCase(Locale.ROOT)) {
                 case "NO_DEBUG":
-                    flags |= NO_NAMED_LOCALS | NO_SOURCE_EXT | NO_SOURCE_NAMES | NO_MODULE_VERSIONS | NO_LINE_NUMBERS;
+                    flags |= NO_NAMED_PARAMS | NO_NAMED_LOCALS | NO_SOURCE_EXT | NO_SOURCE_NAMES | NO_MODULE_VERSIONS | NO_LINE_NUMBERS;
+                    break;
+                case "NO_NAMED_PARAMETERS":
+                case "NO_NAMED_PARAMS":
+                    flags |= NO_NAMED_PARAMS;
                     break;
                 case "NO_NAMED_LOCALS":
                     flags |= NO_NAMED_LOCALS;
@@ -72,6 +153,8 @@ public final class BridgeMojo extends AbstractMojo {
                     flags |= NO_SOURCE_NAMES;
                     break;
                 case "NO_SOURCE_EXT":
+                case "NO_SOURCE_EXTENSION":
+                case "NO_SOURCE_EXTENSIONS":
                     flags |= NO_SOURCE_EXT;
                     break;
                 case "NO_MODULE_VERSION":
@@ -95,24 +178,52 @@ public final class BridgeMojo extends AbstractMojo {
                     log.warn("Unknown recompilation flag: " + flag);
             }
         }
-        TypeMap types = new TypeMap();
         try {
+            int length;
+            TypeMap types = new TypeMap();
             Set<String> unique = new HashSet<>();
             DirectoryScanner scan = new DirectoryScanner();
-            String[] includes = new String[this.includes.length + 1];
-            System.arraycopy(this.includes, 0, includes, 1, this.includes.length);
+            String[] includes = new String[(length = this.includes.length) + 1];
+            System.arraycopy(this.includes, 0, includes, 1, length);
             includes[0] = "**/*.class";
             scan.setBasedir(classpath);
             scan.setIncludes(includes);
             scan.scan();
-            includes = scan.getIncludedFiles();
+            length = (includes = scan.getIncludedFiles()).length;
             final long timestamp = classpath.lastModified();
-            if (lazy && includes.length != 0) for (int i = 0;;) {
-                File file = new File(classpath, includes[i]);
-                if (file.exists() && file.lastModified() >= timestamp) break;
-                if (++i == includes.length) {
+            if (lazy || length == 0) for (int i = 0;;) {
+                if (i == length) {
                     log.info("Nothing to recompile");
                     return;
+                }
+                final File file;
+                if ((file = new File(classpath, includes[i++])).exists() && file.lastModified() >= timestamp) {
+                    break;
+                }
+            }
+
+            final Set<Artifact> artifacts;
+            final Dependency[] dependencies;
+            if ((dependencies = this.dependencies) == null || (length = dependencies.length) == 0) {
+                artifacts = project.getArtifacts();
+            } else {
+                artifacts = new LinkedHashSet<>(project.getArtifacts());
+                for (int i = 0; i != length;) {
+                    for (final Iterator<ArtifactResult> it = system.resolveDependencies(
+                            session.getRepositorySession(),
+                            new DependencyRequest(
+                                    new CollectRequest(
+                                            RepositoryUtils.toDependency(dependencies[i++], RepositoryUtils.newArtifactTypeRegistry(manager)),
+                                            project.getRemoteProjectRepositories()
+                                    ),
+                                    null
+                            )
+                    ).getArtifactResults().iterator(); it.hasNext();) {
+                        final Artifact artifact;
+                        if (artifacts.add(artifact = RepositoryUtils.toArtifact(it.next().getArtifact()))) {
+                            artifact.setScope("provided");
+                        }
+                    }
                 }
             }
 
@@ -126,20 +237,27 @@ public final class BridgeMojo extends AbstractMojo {
                     try (InputStream fis = Files.newInputStream(file.toPath())) {
                         new ClassReader(fis).accept(new BridgeScanner(types), ClassReader.SKIP_CODE | ClassReader.SKIP_FRAMES | ClassReader.SKIP_DEBUG);
                     }
+                    continue;
+                }
+                if (log.isDebugEnabled()) {
+                    log.debug(" - " + file);
                 }
             }
 
-            for (Artifact artifact : project.getArtifacts()) {
+            for (Artifact artifact : artifacts) {
                 File file = artifact.getFile();
                 if (file.getName().endsWith(".jar") && file.exists()) {
                     log.info("  + " + file + " (" + artifact.getScope() + ')');
                     try (ZipInputStream zis = new ZipInputStream(Files.newInputStream(file.toPath()))) {
                         for (ZipEntry entry; (entry = zis.getNextEntry()) != null;) {
-                            if (entry.getName().endsWith(".class") && unique.add(entry.getName())) {
-                                new ClassReader(zis).accept(new HierarchyScanner(types), ClassReader.SKIP_CODE | ClassReader.SKIP_FRAMES | ClassReader.SKIP_DEBUG);
-                            }
+                            if (!entry.getName().endsWith(".class") || !unique.add(entry.getName())) continue;
+                            new ClassReader(zis).accept(new HierarchyScanner(types), ClassReader.SKIP_CODE | ClassReader.SKIP_FRAMES | ClassReader.SKIP_DEBUG);
                         }
                     }
+                    continue;
+                }
+                if (log.isDebugEnabled()) {
+                    log.debug(" - " + file + " (" + artifact.getScope() + ')');
                 }
             }
 
@@ -155,38 +273,38 @@ public final class BridgeMojo extends AbstractMojo {
             for (String path : scan.getIncludedFiles()) {
                 File in = new File(classpath, path);
                 if (in.exists()) {
+                    ClassNode code;
+                    BridgeVisitor visitor;
                     path = path.replace(File.separatorChar, '/');
                     if (log.isDebugEnabled()) log.debug("<- " + path);
                     try (InputStream is = Files.newInputStream(in.toPath())) {
-                        ClassNode code;
-                        BridgeVisitor visitor;
                         new ClassReader(is).accept(visitor = new BridgeVisitor(code = new ClassNode(), types), ClassReader.EXPAND_FRAMES);
-                        is.close();
-                        int i;
-                        if (visitor.bridges != 0 || visitor.invocations != 0 || visitor.adjustments != 0 || visitor.forks.size() != 1) {
-                            StringBuilder msg = new StringBuilder().append(" -> ").append(
-                                    ((i = path.lastIndexOf(visitor.name)) != -1 && path.indexOf('/', i + visitor.name.length()) == -1)?
-                                            path.substring(0, i) + visitor.name.replace('/', '.') : path
-                            );
-                            if ((i = visitor.forks.size()) != 1) msg.append("  +").append(i - 1).append(" fork").append((i == 2)?"":"s");
-                            if (visitor.bridges != 0) msg.append("  +").append(visitor.bridges).append(" bridge").append((visitor.bridges == 1)?"":"s");
-                            if (visitor.invocations != 0) msg.append("  +").append(visitor.invocations).append(" invocation").append((visitor.invocations == 1)?"":"s");
-                            if (visitor.adjustments != 0) msg.append("  +").append(visitor.adjustments).append(" adjustment").append((visitor.adjustments == 1)?"":"s");
-                            log.info(msg.toString());
-                        }
-                        File out;
-                        HierarchicalWriter writer;
-                        for (Map.Entry<Integer, Boolean> e : visitor.forks.entrySet()) {
-                            code.accept(new ForkVisitor(
-                                    writer = new HierarchicalWriter(types, ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS),
-                                    visitor,
-                                    i = e.getKey(),
-                                    flags
-                            ));
-                            (out = ((e.getValue())? new File(classpath, "META-INF/versions/" + i + "/" + visitor.name + ".class") : in)).getParentFile().mkdirs();
-                            try (OutputStream os = Files.newOutputStream(out.toPath())) {
-                                os.write(writer.toByteArray());
-                            }
+                    }
+                    int i;
+                    if (visitor.bridges != 0 || visitor.invocations != 0 || visitor.adjustments != 0 || visitor.removals != 0 || visitor.forks.size() != 1) {
+                        StringBuilder msg = new StringBuilder().append(" -> ").append(
+                                ((i = path.lastIndexOf(visitor.name)) >= 0 && path.indexOf('/', i + visitor.name.length()) < 0)?
+                                        path.substring(0, i) + visitor.name.replace('/', '.') : path
+                        );
+                        if ((i = visitor.forks.size()) != 1) msg.append("  +").append(--i).append(" fork").append((i == 1)?"":"s");
+                        if ((i = visitor.bridges) != 0) msg.append("  +").append(i).append(" bridge").append((i == 1)?"":"s");
+                        if ((i = visitor.invocations) != 0) msg.append("  +").append(i).append(" invocation").append((i == 1)?"":"s");
+                        if ((i = visitor.adjustments) != 0) msg.append("  +").append(i).append(" adjustment").append((i == 1)?"":"s");
+                        if ((i = visitor.removals) != 0) msg.append("  +").append(i).append(" removal").append((i == 1)?"":"s");
+                        log.info(msg.toString());
+                    }
+                    File out;
+                    HierarchicalWriter writer;
+                    for (Map.Entry<Integer, Boolean> e : visitor.forks.entrySet()) {
+                        code.accept(new ForkVisitor(
+                                writer = new HierarchicalWriter(types, ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS),
+                                visitor,
+                                i = e.getKey(),
+                                flags
+                        ));
+                        (out = ((e.getValue())? new File(classpath, "META-INF/versions/" + i + '/' + visitor.name + ".class") : in)).getParentFile().mkdirs();
+                        try (OutputStream os = Files.newOutputStream(out.toPath())) {
+                            os.write(writer.toByteArray());
                         }
                     }
                 }
@@ -197,7 +315,7 @@ public final class BridgeMojo extends AbstractMojo {
             log.info("Hierarchy resolved in " + humanize(scantime));
             log.info("Recompiled in " + humanize(comptime));
             classpath.setLastModified((Instant.now().getEpochSecond() * 1000) + 1000);
-        } catch (IOException e) {
+        } catch (Throwable e) {
             throw new MojoExecutionException(e);
         }
     }

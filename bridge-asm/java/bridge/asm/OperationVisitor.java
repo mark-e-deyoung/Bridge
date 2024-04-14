@@ -85,8 +85,19 @@ public abstract class OperationVisitor extends MethodVisitor {
     }
 
     @Override
+    @Deprecated
+    @SuppressWarnings({"DeprecatedIsStillUsed", "deprecation"})
+    public void visitMethodInsn(int opcode, String owner, String name, String descriptor) {
+        visitMethodInsn((api < ASM5)? SOURCE_DEPRECATED | opcode : opcode, owner, name, descriptor, opcode == INVOKEINTERFACE);
+    }
+
+    @Override
     public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
-        visitOperation(opcode);
+        if (api < ASM5 && (opcode & SOURCE_DEPRECATED) == 0 && (opcode == INVOKEINTERFACE) == isInterface) {
+            visitMethodInsn(opcode, owner, name, descriptor);
+            return;
+        }
+        visitOperation(opcode & ~SOURCE_MASK);
         super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
     }
 

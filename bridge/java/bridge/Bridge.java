@@ -8,51 +8,53 @@ import static org.objectweb.asm.Opcodes.*;
 
 /**
  * An annotation for creating field &amp; method bridges
+ *
+ * @implNote Usages of this annotation are counted as {@code bridges}.
  */
 @Repeatable(Bridges.class)
 @Target({ CONSTRUCTOR, METHOD, FIELD })
 public @interface Bridge {
 
     /**
-     * <code>public</code> access modifier for field &amp; method bridging
+     * {@code public} access modifier for field &amp; method bridging
      */
     int PUBLIC = ACC_PUBLIC;
 
     /**
-     * <code>protected</code> access modifier for field &amp; method bridging
+     * {@code protected} access modifier for field &amp; method bridging
      */
     int PROTECTED = ACC_PROTECTED;
 
     /**
-     * <code>private</code> access modifier for field &amp; method bridging
+     * {@code private} access modifier for field &amp; method bridging
      */
     int PRIVATE = ACC_PRIVATE;
 
     /**
-     * <code>static</code> access modifier for field &amp; method bridging
+     * {@code static} access modifier for field &amp; method bridging
      * @implNote This flag cannot be added to fields or methods where it does not already exist
      */
     int STATIC = ACC_STATIC;
 
     /**
-     * <code>final</code> access modifier for field &amp; method bridging
+     * {@code final} access modifier for field &amp; method bridging
      */
     int FINAL = ACC_FINAL;
 
     /**
-     * <code>synthetic</code> access modifier for field &amp; method bridging
+     * {@code synthetic} access modifier for field &amp; method bridging
      * @implNote This flag is applied by default to all bridges.
      */
     int SYNTHETIC = ACC_SYNTHETIC;
 
     /**
-     * <code>transient</code> access modifier for field bridging
+     * {@code transient} access modifier for field bridging
      * @implNote This flag is applied by default to field bridges.
      */
     int TRANSIENT = ACC_TRANSIENT;
 
     /**
-     * <code>varargs</code> access modifier for method bridging
+     * {@code varargs} access modifier for method bridging
      */
     int VARARGS = ACC_VARARGS;
 
@@ -77,7 +79,7 @@ public @interface Bridge {
      * @implNote The position of parameters in the bridge must be the same as those in the @annotated method
      * @return Parameters
      */
-    Class<?>[] params() default Bridges.class;
+    Class<?>[] params() default Polymorphic.class;
 
     /**
      * Specifies when to start loading arguments from the bridge method
@@ -105,7 +107,7 @@ public @interface Bridge {
      *
      * @return Checked exception list
      */
-    Class<? extends Throwable>[] exceptions() default Unchecked.class;
+    Class<? extends Throwable>[] exceptions() default AccessError.class;
 
     /**
      * Specifies generic type data
@@ -119,10 +121,10 @@ public @interface Bridge {
      *
      * @return Return type
      */
-    Class<?> returns() default Bridges.class;
+    Class<?> returns() default Polymorphic.class;
 
     /**
-     * Specifies that this bridge is <code>@Deprecated</code>
+     * Specifies that this bridge is {@code @Deprecated}
      *
      * @return Deprecation status
      */

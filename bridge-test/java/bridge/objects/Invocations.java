@@ -47,6 +47,38 @@ class Invocations {
 
 
 
+    // static type checking, test 1
+    static void SI01() {
+        assert new Invocation(Dummy.class).ofInstanceOf(Dummy.class);
+    }
+
+    // static type checking, test 2
+    static void SI02() {
+        assert new Invocation(Dummy.class).ofInstanceOf(Super.class);
+    }
+
+    // static type checking, test 3
+    static void SI03() {
+        assert !new Invocation(Dummy.class).ofInstanceOf(Jester.class);
+    }
+
+    // static type checking, test 4
+    static void SI04() {
+        assert !new Invocation(Void.class).ofInstanceOf(Invocations.class);
+    }
+
+    // static type checking, test 5
+    static void SI05() {
+        assert new Invocation(Dummy[][].class).ofInstanceOf(Object[].class);
+    }
+
+    // static type checking, test 6
+    static void SI06() {
+        assert !new Invocation(Dummy[][].class).ofInstanceOf(Super[].class);
+    }
+
+
+
     // static fields, object get
     static void SF01() {
         assert new Invocation(Dummy.class).ofField(Super.class, "s_obj").get() == generic;
@@ -292,33 +324,33 @@ class Invocations {
 
 
     // instance type checking, test 1
-    static void VC01() {
-        assert new Invocation(instance).ofInstanceOf();
+    static void VI01() {
+        assert new Invocation(instance).ofInstanceOf(Dummy.class);
     }
 
     // instance type checking, test 2
-    static void VC02() {
-        assert new Invocation(Super.class, instance).ofInstanceOf();
+    static void VI02() {
+        assert new Invocation(instance).ofInstanceOf(Super.class);
     }
 
     // instance type checking, test 3
-    static void VC03() {
-        assert !new Invocation(Jester.class, instance).ofInstanceOf();
+    static void VI03() {
+        assert !new Invocation(instance).ofInstanceOf(Jester.class);
     }
 
     // instance type checking, test 4
-    static void VC04() {
-        assert !new Invocation(Invocations.class, null).ofInstanceOf();
+    static void VI04() {
+        assert !new Invocation((Object) null).ofInstanceOf(Invocations.class);
     }
 
     // instance type checking, test 5
-    static void VC05() {
-        assert new Invocation(Object[].class, new Dummy[0][]).ofInstanceOf();
+    static void VI05() {
+        assert new Invocation(new Dummy[0][]).ofInstanceOf(Object[].class);
     }
 
     // instance type checking, test 6
-    static void VC06() {
-        assert !new Invocation(Super[].class, new Dummy[0][]).ofInstanceOf();
+    static void VI06() {
+        assert !new Invocation(new Dummy[0][]).ofInstanceOf(Super[].class);
     }
 
 

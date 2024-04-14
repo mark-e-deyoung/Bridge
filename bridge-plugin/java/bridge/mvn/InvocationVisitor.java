@@ -7,7 +7,6 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.AnalyzerAdapter;
 
 import java.util.*;
-import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import static bridge.asm.Types.*;
@@ -19,11 +18,11 @@ import static org.objectweb.asm.Opcodes.*;
 // <input> -> Analyzer/Listener (this) -> BridgeVisitor -> <output>
 // <input> -> Analyzer/Listener (this) -> Possible Invocation -> BridgeVisitor -> <output>
 // <input> -> Analyzer/Listener (this) -> Possible Invocation B (inner) -> Possible Invocation A (outer) -> BridgeVisitor -> <output>
-final class InvocationVisitor extends AnalyzerAdapter implements Linked<MethodVisitor> {
+final class InvocationVisitor extends AnalyzerAdapter implements LinkedVisitor {
+    private Map<Object, Map.Entry<Label, Integer>> labels;
     private final TypeMap types;
     private final BridgeVisitor caller;
     private final String method;
-    private Map<Object, Map.Entry<Label, Integer>> labels;
     private int line;
 
     InvocationVisitor(BridgeVisitor caller, int access, String name, String descriptor, MethodVisitor delegate) {
@@ -65,15 +64,14 @@ final class InvocationVisitor extends AnalyzerAdapter implements Linked<MethodVi
     @Override
     public void visitFieldInsn(int opcode, String owner, String name, String descriptor) {
         if (opcode == GETSTATIC && "bridge/Invocation".equals(owner) && "LANGUAGE_LEVEL".equals(name)) {
-            final class LANGUAGE_LEVEL extends MethodVisitor implements Linked<MethodVisitor> {
+            final class LANGUAGE_LEVEL extends MethodVisitor implements LinkedVisitor {
                 private MethodVisitor parent;
                 private int version;
 
-                @SuppressWarnings("unchecked")
                 private LANGUAGE_LEVEL(MethodVisitor delegate) {
                     super(ASM9, delegate);
-                    if (delegate instanceof Linked) {
-                        ((Linked<MethodVisitor>) delegate).setParent(this);
+                    if (delegate instanceof LinkedVisitor) {
+                        ((LinkedVisitor) delegate).setParent(this);
                     }
                 }
 
@@ -110,7 +108,6 @@ final class InvocationVisitor extends AnalyzerAdapter implements Linked<MethodVi
                     super.visitLdcInsn(value);
                 }
 
-                @SuppressWarnings("unchecked")
                 @Override
                 public void visitJumpInsn(int opcode, Label label) {
                     int target = this.version;
@@ -132,9 +129,7 @@ final class InvocationVisitor extends AnalyzerAdapter implements Linked<MethodVi
                         case IF_ICMPLT: // >= target
                         case IF_ICMPGE: // <  target
                             fork(target);
-                            if (((Linked<MethodVisitor>) parent).setDelegate(mv) instanceof Linked) {
-                                ((Linked<MethodVisitor>) mv).setParent(parent);
-                            }
+                            if (((LinkedVisitor) parent).setDelegate(mv) instanceof LinkedVisitor) ((LinkedVisitor) mv).setParent(parent);
                     }
                 }
 
@@ -158,10 +153,81 @@ final class InvocationVisitor extends AnalyzerAdapter implements Linked<MethodVi
     }
 
     @Override
-    public void visitMethodInsn(int opcodeAndSource, String owner, String name, String descriptor, boolean isInterface) {
-        if ((opcodeAndSource & ~SOURCE_MASK) != INVOKESTATIC || !"bridge/Unchecked".equals(owner) || !"check".equals(name) || !"()V".equals(descriptor)) {
-            super.visitMethodInsn(opcodeAndSource, owner, name, descriptor, isInterface);
+    public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
+        if (opcode == INVOKESTATIC && "bridge/Unchecked".equals(owner)) {
+            if ("cast".equals(name) && "(Ljava/lang/Object;)Ljava/lang/Object;".equals(descriptor)) {
+                final class UncheckedCast extends OperationVisitor implements LinkedVisitor {
+                    private MethodVisitor parent;
+                    private KnownType returns = types.load(Type.getObjectType(stack.get(stack.size() - 1).toString()));
+                    private KnownType casted = types.load(OBJECT_TYPE);
+
+                    private UncheckedCast(MethodVisitor delegate) {
+                        super(ASM9, delegate);
+                        if (delegate instanceof LinkedVisitor) {
+                            ((LinkedVisitor) delegate).setParent(this);
+                        }
+                    }
+
+                    @Override
+                    public <T extends MethodVisitor> T setDelegate(T value) {
+                        mv = value;
+                        return value;
+                    }
+
+                    @Override
+                    public MethodVisitor getParent() {
+                        return parent;
+                    }
+
+                    @Override
+                    public <T extends MethodVisitor> T setParent(T value) {
+                        parent = value;
+                        return value;
+                    }
+
+                    @Override
+                    public void visitTypeInsn(int opcode, String type) {
+                        if (opcode == CHECKCAST) {
+                            casted = types.loadClass(type);
+                            return;
+                        }
+                        super.visitTypeInsn(opcode, type);
+                    }
+
+                    @Override
+                    public void visitInsn(int opcode) {
+                        if (opcode == POP) {
+                            casted = types.load(VOID_TYPE);
+                            visitOperation(POP);
+                            return;
+                        }
+                        super.visitInsn(opcode);
+                    }
+
+                    @Override
+                    public void visitOperation(int opcode) {
+                        cast(mv, returns, casted);
+                        int i;
+                        if ((i = stack.size()) != 0 && "java/lang/Object".equals(stack.get(--i))) stack.set(i, returns.type.getInternalName());
+                        if (((LinkedVisitor) parent).setDelegate(mv) instanceof LinkedVisitor) ((LinkedVisitor) mv).setParent(parent);
+                        ++caller.removals;
+                    }
+
+                    @Override
+                    public void visitFrame(int type, int numLocal, Object[] local, int numStack, Object[] stack) {}
+                    public void visitMaxs(int maxStack, int maxLocals) {}
+                    public void visitEnd() {
+                        throw exception("Method ended despite incomplete cast operation");
+                    }
+                }
+                setDelegate(new UncheckedCast(mv)).setParent(this);
+                return;
+            } else if ("check".equals(name) && "()V".equals(descriptor)) {
+                ++caller.removals;
+                return;
+            }
         }
+        super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
     }
 
     @Override
@@ -182,17 +248,16 @@ final class InvocationVisitor extends AnalyzerAdapter implements Linked<MethodVi
         if (opcode == NEW) {
             final boolean jump;
             if ((jump = "bridge/Jump".equals(type)) || "bridge/Label".equals(type)) {
-                final class LabelAndJump extends MethodVisitor implements Linked<MethodVisitor> {
+                final class LabelAndJump extends MethodVisitor implements LinkedVisitor {
                     private MethodVisitor parent;
                     private Object id;
                     private int one;
                     private int state = 0x00;
 
-                    @SuppressWarnings("unchecked")
                     private LabelAndJump(MethodVisitor delegate) {
                         super(ASM9, delegate);
-                        if (delegate instanceof Linked) {
-                            ((Linked<MethodVisitor>) delegate).setParent(this);
+                        if (delegate instanceof LinkedVisitor) {
+                            ((LinkedVisitor) delegate).setParent(this);
                         }
                     }
 
@@ -294,12 +359,10 @@ final class InvocationVisitor extends AnalyzerAdapter implements Linked<MethodVi
                         }
                     }
 
-                    @SuppressWarnings("unchecked")
                     private void exit() {
-                        if (((Linked<MethodVisitor>) parent).setDelegate(mv) instanceof Linked) {
-                            ((Linked<MethodVisitor>) mv).setParent(parent);
-                        }
+                        if (((LinkedVisitor) parent).setDelegate(mv) instanceof LinkedVisitor) ((LinkedVisitor) mv).setParent(parent);
                         if (jump) ++caller.invocations;
+                        else ++caller.removals;
                         state = 0x04;
                     }
 
@@ -312,16 +375,15 @@ final class InvocationVisitor extends AnalyzerAdapter implements Linked<MethodVi
                 }
                 setDelegate(new LabelAndJump(mv)).setParent(this);
             } else if ("bridge/Unchecked".equals(type)) {
-                final class Unchecked extends MethodVisitor implements Linked<MethodVisitor> {
+                final class Unchecked extends MethodVisitor implements LinkedVisitor {
                     private MethodVisitor parent;
                     private int one;
                     private Boolean state;
 
-                    @SuppressWarnings("unchecked")
                     private Unchecked(MethodVisitor delegate) {
                         super(ASM9, delegate);
-                        if (delegate instanceof Linked) {
-                            ((Linked<MethodVisitor>) delegate).setParent(this);
+                        if (delegate instanceof LinkedVisitor) {
+                            ((LinkedVisitor) delegate).setParent(this);
                         }
                     }
 
@@ -362,14 +424,12 @@ final class InvocationVisitor extends AnalyzerAdapter implements Linked<MethodVi
                         }
                     }
 
-                    @SuppressWarnings("unchecked")
                     @Override
                     public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
                         if (stack.size() == one && descriptor.endsWith(")V")) {
                             if (state == Boolean.TRUE) stack.set(one - 3, stack.get(one - 1));
-                            if (((Linked<MethodVisitor>) parent).setDelegate(mv) instanceof Linked) {
-                                ((Linked<MethodVisitor>) mv).setParent(parent);
-                            }
+                            if (((LinkedVisitor) parent).setDelegate(mv) instanceof LinkedVisitor) ((LinkedVisitor) mv).setParent(parent);
+                            ++caller.removals;
                         } else {
                             super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
                         }
@@ -384,7 +444,7 @@ final class InvocationVisitor extends AnalyzerAdapter implements Linked<MethodVi
                 }
                 setDelegate(new Unchecked(mv)).setParent(this);
             } else if ("bridge/Invocation".equals(type)) {
-                final class Invocation extends QueuedVisitor implements Linked<MethodVisitor> {
+                final class Invocation extends QueuedVisitor implements LinkedVisitor {
                     private MethodVisitor parent;
                     private int ldi, zero, virtual;
                     private Object ldc;
@@ -395,11 +455,10 @@ final class InvocationVisitor extends AnalyzerAdapter implements Linked<MethodVi
                     private Supplier<KnownType> defaults = () -> casted;
                     private int state = 0x00;
 
-                    @SuppressWarnings("unchecked")
                     private Invocation(MethodVisitor delegate) {
                         super(ASM9, delegate);
-                        if (delegate instanceof Linked) {
-                            ((Linked<MethodVisitor>) delegate).setParent(this);
+                        if (delegate instanceof LinkedVisitor) {
+                            ((LinkedVisitor) delegate).setParent(this);
                         }
                     }
 
@@ -418,6 +477,30 @@ final class InvocationVisitor extends AnalyzerAdapter implements Linked<MethodVi
                     public <T extends MethodVisitor> T setParent(T value) {
                         parent = value;
                         return value;
+                    }
+
+                    @Override
+                    public void visitOperation(int opcode, Runnable op) {
+                        queue(op);
+                    }
+
+                    private void queue(Runnable operation) {
+                        if (state <= 0x05) {
+                            primitive = null;
+                            ops.add(operation);
+                        } else if (state == 0x06) {
+                            state = 0x07; // this is a hack that temporarily hides the internal top known stack value ...
+                            final Object hack = (stack.size() == 0)? params : stack.remove(stack.size() - 1);
+                            if (returns == null) returns = defaults.get();
+                            for (Runnable op : ops) op.run();
+                            cast(mv, returns, casted);        // ... fixing input and type detection for nested invocations
+                            if (hack != params) stack.add(("java/lang/Object".equals(hack))? box(returns.type).getInternalName() : hack);
+                            if (((LinkedVisitor) parent).setDelegate(mv) instanceof LinkedVisitor) ((LinkedVisitor) mv).setParent(parent);
+                            ++caller.invocations;
+                            operation.run();
+                        } else {
+                            throw exception("Illegal state [0x0" + Integer.toHexString(state) + ']');
+                        }
                     }
 
                     @Override
@@ -461,28 +544,6 @@ final class InvocationVisitor extends AnalyzerAdapter implements Linked<MethodVi
                             return;
                         }
                         super.visitInsn(opcode);
-                    }
-
-                    @SuppressWarnings("unchecked")
-                    public void queue(Runnable operation) {
-                        if (state <= 0x05) {
-                            primitive = null;
-                            super.queue(operation);
-                        } else if (state == 0x06) {
-                            state = 0x07; // this is a hack that temporarily hides the internal top known stack value ...
-                            final Object hack = (stack.size() == 0)? null : stack.remove(stack.size() - 1);
-                            if (returns == null) returns = defaults.get();
-                            for (Runnable op : ops) op.run();
-                            cast(mv, returns, casted);        // ... fixing input and type detection for nested invocations
-                            if (hack != null) stack.add((hack.equals("java/lang/Object"))? box(returns.type).getInternalName() : hack);
-                            if (((Linked<MethodVisitor>) parent).setDelegate(mv) instanceof Linked) {
-                                ((Linked<MethodVisitor>) mv).setParent(parent);
-                            }
-                            ++caller.invocations;
-                            operation.run();
-                        } else {
-                            throw exception("Illegal state [0x0" + Integer.toHexString(state) + ']');
-                        }
                     }
 
                     @Override
@@ -557,16 +618,14 @@ final class InvocationVisitor extends AnalyzerAdapter implements Linked<MethodVi
                                     this.owner = stack(OBJECT_SORT, 0);
                                     virtual = ops.size();
                                     ldc = null;
-                                    ldi = 0;
                                 } else {
-                                    if (this.ldc == null) throw exception("Attempted invocation on unknown type");
                                     if ((this.owner = consume()).isPrimitive()) {
                                         throw exception("Attempted invocation on primitive type");
                                     }
                                     if (params == 2) {
                                         KnownType type = stack(OBJECT_SORT, 1);
-                                        virtual = (ldi = ops.size()) + 1;
                                         queue(() -> cast(mv, type, this.owner));
+                                        virtual = ops.size();
                                     }
                                 }
                                 --zero;
@@ -574,7 +633,7 @@ final class InvocationVisitor extends AnalyzerAdapter implements Linked<MethodVi
                                 return;
                             }
                         } else if (state <= 0x04) {
-                            if (this.ldc != null) {
+                            if (name.length() != 12 && this.ldc != null) {
                                 if (this.name == null) {
                                     this.ops.remove(ldi);
                                     this.name = ldc.toString();
@@ -607,24 +666,29 @@ final class InvocationVisitor extends AnalyzerAdapter implements Linked<MethodVi
                                     });
                                     this.name = null;
                                     break;
-                                case "ofInstanceOf":
-                                    if (virtual == 0)
-                                        throw exception("Attempted instanceof without instance");
-                                    if (ldi != 0) {
-                                        this.ops.remove(ldi);
-                                    }
-                                    queue(() -> mv.visitTypeInsn(INSTANCEOF, this.owner.type.getInternalName()));
-                                    casted = returns = types.load(BOOLEAN_TYPE);
+                                case "ofClassLiteral":
+                                    queue(this::statement);
+                                    if (virtual != 0) queue(() ->
+                                        mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Object", "getClass", "()Ljava/lang/Class;", false)
+                                    );else queue(() ->
+                                        mv.visitLdcInsn(this.owner.type)
+                                    );
+                                    casted = returns = types.load(CLASS_TYPE);
                                     state = 0x06;
                                     return;
-                                case "ofClassLiteral":
+                                case "ofInstanceOf":
+                                    KnownType type;
+                                    if ((type = consume()).isPrimitive())
+                                        throw exception("Attempted instanceof primitive type");
+                                    queue(this::statement);
                                     if (virtual != 0) queue(() ->
-                                            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Object", "getClass", "()Ljava/lang/Class;", false)
+                                        mv.visitTypeInsn(INSTANCEOF, type.type.getInternalName())
                                     );else queue(() -> {
-                                        if (casted.type.getSort() == VOID_SORT) throw exception("Invocation does not result in a statement");
+                                        mv.visitLdcInsn(type.type);
                                         mv.visitLdcInsn(this.owner.type);
+                                        mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Class", "isAssignableFrom", "(Ljava/lang/Class;)Z", false);
                                     });
-                                    casted = returns = types.load(CLASS_TYPE);
+                                    casted = returns = types.load(BOOLEAN_TYPE);
                                     state = 0x06;
                                     return;
                                 default:
@@ -636,182 +700,180 @@ final class InvocationVisitor extends AnalyzerAdapter implements Linked<MethodVi
                             Type[] params = Type.getArgumentTypes(descriptor);
 
                             if (stack.size() == size(params) + zero) {
-                                if (owner.equals("bridge/Invocation$Executor")) {
-                                    if (name.equals("with")) {
-                                        if (params.length == 1) {
-                                            ldc = null;
-                                            this.params.add(stack(params[0].getSort(), 0).type);
-                                        } else if (primitive == VOID_TYPE) {
-                                            this.params.add(consume().type);
-                                        } else {
-                                            final KnownType param, arg;
-                                            if ((param = consume()).type == VOID_TYPE) {
-                                                throw exception("Attempted use of void argument");
-                                            }
-                                            final Type primitive;
-                                            if ((primitive = this.primitive) != null) {
-                                                this.ops.removeLast();
-                                                this.primitive = null;
-                                                arg = types.load(primitive);
-                                            } else {
-                                                arg = stack(OBJECT_SORT, 1);
-                                            }
-                                            this.params.add(param.type);
-                                            queue(() -> cast(mv, arg, param));
-                                        }
-
-                                        // Additional checks required for safe array initialization
-                                        if (this.name == null && this.owner.isArray()) {
-                                            if (((ArrayType) this.owner).depth < this.params.size()) {
-                                                throw exception("Array depth exceeds type declaration");
-                                            } else {
-                                                final Type type;
-                                                if ((type = this.params.getLast()).getSort() != INT_SORT) {
-                                                    queue(() -> cast(mv, type, INT_TYPE));
-                                                }
-                                            }
-                                        }
-                                    } else if (name.equals("check")) {
-                                        if (ldc != null) {
-                                            this.ops.remove(ldi);
-                                            this.ldc = null;
-                                        }
-                                    } else if (name.equals("invoke")) {
-                                        if (this.name != null) {
-                                            queue(() -> {
-                                                final String desc = Type.getMethodDescriptor(returns.type, this.params.toArray(new Type[0]));
-                                                mv.visitMethodInsn((virtual == 0)? INVOKESTATIC : (special(desc))? INVOKESPECIAL : (this.owner.isInterface())? INVOKEINTERFACE : INVOKEVIRTUAL,
-                                                        this.owner.type.getInternalName(),
-                                                        this.name,
-                                                        desc,
-                                                        this.owner.isInterface()
-                                                );
-                                            });
-                                        } else if (!this.owner.isArray()) {
-                                            queue(() -> mv.visitMethodInsn(INVOKESPECIAL, this.owner.type.getInternalName(), "<init>", Type.getMethodDescriptor(VOID_TYPE, this.params.toArray(new Type[0])), false));
-                                        } else {
-                                            queue(() -> {
-                                                if (casted.type.getSort() == VOID_SORT) throw exception("Invocation does not result in a statement");
-                                                final int depth;
-                                                if ((depth = this.params.size()) == 0) {
-                                                    throw exception("Attempted array creation with undefined length");
-                                                } else if (depth == 1) {
-                                                    final Type type;
-                                                    switch ((type = ((ArrayType) this.owner).element.type).getSort()) {
-                                                        case BOOLEAN_SORT:
-                                                            mv.visitIntInsn(NEWARRAY, T_BOOLEAN);
-                                                            break;
-                                                        case CHAR_SORT:
-                                                            mv.visitIntInsn(NEWARRAY, T_CHAR);
-                                                            break;
-                                                        case BYTE_SORT:
-                                                            mv.visitIntInsn(NEWARRAY, T_BYTE);
-                                                            break;
-                                                        case SHORT_SORT:
-                                                            mv.visitIntInsn(NEWARRAY, T_SHORT);
-                                                            break;
-                                                        case INT_SORT:
-                                                            mv.visitIntInsn(NEWARRAY, T_INT);
-                                                            break;
-                                                        case FLOAT_SORT:
-                                                            mv.visitIntInsn(NEWARRAY, T_FLOAT);
-                                                            break;
-                                                        case LONG_SORT:
-                                                            mv.visitIntInsn(NEWARRAY, T_LONG);
-                                                            break;
-                                                        case DOUBLE_SORT:
-                                                            mv.visitIntInsn(NEWARRAY, T_DOUBLE);
-                                                            break;
-                                                        default:
-                                                            mv.visitTypeInsn(ANEWARRAY, type.getInternalName());
+                                switch (owner) {
+                                    case "bridge/Invocation$Executor":
+                                        switch (name) {
+                                            case "with":
+                                                if (params.length == 1) {
+                                                    ldc = null;
+                                                    this.params.add(stack(params[0].getSort(), 0).type);
+                                                } else if (primitive == VOID_TYPE) {
+                                                    this.params.add(consume().type);
+                                                } else {
+                                                    final KnownType param, arg;
+                                                    if ((param = consume()).type == VOID_TYPE) {
+                                                        throw exception("Attempted use of void argument");
                                                     }
-                                                } else {
-                                                    mv.visitMultiANewArrayInsn(this.owner.type.getInternalName(), depth);
-                                                }
-                                            });
-                                        }
-                                        state = 0x06;
-                                    } else {
-                                        throw exception("Unknown invoke operation [." + name + "()]");
-                                    }
-                                    return;
-                                } else if (owner.equals("bridge/Invocation$Accessor")) {
-                                    if (params.length == 0) {
-                                        if (name.equals("get")) {
-                                            queue(() -> {
-                                                if (casted.type.getSort() == VOID_SORT) throw exception("Invocation does not result in a statement");
-                                                if (!this.owner.isArray() || virtual == 0 || !this.name.equals("length")) {
-                                                    mv.visitFieldInsn((virtual == 0)? GETSTATIC : GETFIELD, this.owner.type.getInternalName(), this.name, returns.type.getDescriptor());
-                                                } else {
-                                                    mv.visitInsn(ARRAYLENGTH);
-                                                    returns = types.load(INT_TYPE);
-                                                }
-                                            });
-                                        } else {
-                                            throw exception("Unknown read operation [." + name + "()]");
-                                        }
-                                    } else if (params.length == 1) {
-                                        final KnownType arg = stack(params[0].getSort(), 0);
-                                        defaults = () -> (casted.type.getSort() == VOID_SORT)? arg : casted;
-
-                                        final int index = ops.size();
-                                        queue(() -> cast(mv, arg, returns));
-                                        queue(() -> mv.visitFieldInsn((virtual == 0)? PUTSTATIC : PUTFIELD, this.owner.type.getInternalName(), this.name, returns.type.getDescriptor()));
-
-                                        if (name.equals("getAndSet")) {
-                                            ops.add(virtual, () -> {
-                                                final int size;
-                                                if ((size = size(casted)) != VOID_SORT) {
-                                                    if (virtual == 0) {
-                                                        mv.visitFieldInsn(GETSTATIC, this.owner.type.getInternalName(), this.name, returns.type.getDescriptor());
+                                                    final Type primitive;
+                                                    if ((primitive = this.primitive) != null) {
+                                                        this.ops.removeLast();
+                                                        this.primitive = null;
+                                                        arg = types.load(primitive);
                                                     } else {
-                                                        mv.visitInsn(DUP);
-                                                        mv.visitFieldInsn(GETFIELD, this.owner.type.getInternalName(), this.name, returns.type.getDescriptor());
-                                                        if (size(returns) != 1) { // use switch(pair()) instead if new data categories are added
-                                                            if (size != 1) {
-                                                                mv.visitInsn(DUP2_X1);
-                                                                mv.visitInsn(POP2);
-                                                                return;
-                                                            }
-                                                            cast(mv, returns, casted);
-                                                            casted = returns;
+                                                        arg = stack(OBJECT_SORT, 1);
+                                                    }
+                                                    this.params.add(param.type);
+                                                    queue(() -> cast(mv, arg, param));
+                                                }
+
+                                                // Additional checks required for safe array initialization
+                                                if (this.name == null && this.owner.isArray()) {
+                                                    if (((ArrayType) this.owner).depth < this.params.size()) {
+                                                        throw exception("Array depth exceeds type declaration");
+                                                    } else {
+                                                        final Type type;
+                                                        if ((type = this.params.getLast()).getSort() != INT_SORT) {
+                                                            queue(() -> cast(mv, type, INT_TYPE));
                                                         }
-                                                        mv.visitInsn(SWAP);
                                                     }
-                                                } else {// disable casting
-                                                    casted = returns;
                                                 }
-                                            });
-                                        } else {
-                                            Consumer<KnownType> dup = type -> {
-                                                if (casted.type.getSort() != VOID_SORT) {
-                                                    if (virtual == 0) {
-                                                        mv.visitInsn((size(type) == 2)? DUP2 : DUP);
-                                                    } else {
-                                                        mv.visitInsn((size(type) == 2)? DUP2_X1 : DUP_X1);
-                                                    }
-                                                } else {// disable casting
-                                                    casted = type;
+                                                return;
+                                            case "check":
+                                                if (ldc != null) {
+                                                    this.ops.remove(ldi);
+                                                    this.ldc = null;
                                                 }
-                                            };
-
-                                            if (name.equals("set")) {
-                                                casted = arg;
-                                                defaults = () -> arg;
-                                                ops.add(() -> returns = arg);
-                                                ops.add(index, () -> dup.accept(arg));
-                                            } else if (name.equals("setAndGet")) {
-                                                ops.add(index + 1, () -> dup.accept(returns));
-                                            } else {
-                                                throw exception("Unknown write operation [." + name + "()]");
-                                            }
+                                                return;
+                                            case "invoke":
+                                                if (this.name != null) {
+                                                    queue(() -> {
+                                                        final String desc = Type.getMethodDescriptor(returns.type, this.params.toArray(new Type[0]));
+                                                        mv.visitMethodInsn((virtual == 0)? INVOKESTATIC : (special(desc))? INVOKESPECIAL : (this.owner.isInterface())? INVOKEINTERFACE : INVOKEVIRTUAL,
+                                                                this.owner.type.getInternalName(),
+                                                                this.name,
+                                                                desc,
+                                                                this.owner.isInterface()
+                                                        );
+                                                    });
+                                                } else if (!this.owner.isArray()) {
+                                                    queue(() -> mv.visitMethodInsn(INVOKESPECIAL, this.owner.type.getInternalName(), "<init>", Type.getMethodDescriptor(VOID_TYPE, this.params.toArray(new Type[0])), false));
+                                                } else {
+                                                    queue(() -> {
+                                                        statement();
+                                                        final int depth;
+                                                        switch (depth = this.params.size()) {
+                                                            case 0:
+                                                                throw exception("Attempted array creation with undefined length");
+                                                            case 1:
+                                                                final Type type;
+                                                                switch ((type = ((ArrayType) this.owner).element.type).getSort()) {
+                                                                    case BOOLEAN_SORT:
+                                                                        mv.visitIntInsn(NEWARRAY, T_BOOLEAN);
+                                                                        return;
+                                                                    case CHAR_SORT:
+                                                                        mv.visitIntInsn(NEWARRAY, T_CHAR);
+                                                                        return;
+                                                                    case BYTE_SORT:
+                                                                        mv.visitIntInsn(NEWARRAY, T_BYTE);
+                                                                        return;
+                                                                    case SHORT_SORT:
+                                                                        mv.visitIntInsn(NEWARRAY, T_SHORT);
+                                                                        return;
+                                                                    case INT_SORT:
+                                                                        mv.visitIntInsn(NEWARRAY, T_INT);
+                                                                        return;
+                                                                    case FLOAT_SORT:
+                                                                        mv.visitIntInsn(NEWARRAY, T_FLOAT);
+                                                                        return;
+                                                                    case LONG_SORT:
+                                                                        mv.visitIntInsn(NEWARRAY, T_LONG);
+                                                                        return;
+                                                                    case DOUBLE_SORT:
+                                                                        mv.visitIntInsn(NEWARRAY, T_DOUBLE);
+                                                                        return;
+                                                                    default:
+                                                                        mv.visitTypeInsn(ANEWARRAY, type.getInternalName());
+                                                                }       return;
+                                                            default:
+                                                                mv.visitMultiANewArrayInsn(this.owner.type.getInternalName(), depth);
+                                                        }
+                                                    });
+                                                }
+                                                state = 0x06;
+                                                return;
+                                            default:
+                                                throw exception("Unknown invoke operation [." + name + "()]");
                                         }
-                                    } else {
-                                        throw exception("Too many arguments for field access");
-                                    }
-                                    ldc = null;
-                                    state = 0x06;
-                                    return;
+                                    case "bridge/Invocation$Accessor":
+                                        switch (params.length) {
+                                            case 0:
+                                                if (name.equals("get")) {
+                                                    queue(() -> {
+                                                        statement();
+                                                        if (!this.owner.isArray() || virtual == 0 || !this.name.equals("length")) {
+                                                            mv.visitFieldInsn((virtual == 0)? GETSTATIC : GETFIELD, this.owner.type.getInternalName(), this.name, returns.type.getDescriptor());
+                                                        } else {
+                                                            mv.visitInsn(ARRAYLENGTH);
+                                                            returns = types.load(INT_TYPE);
+                                                        }
+                                                    });
+                                                } else {
+                                                    throw exception("Unknown read operation [." + name + "()]");
+                                                }
+                                                break;
+                                            case 1:
+                                                final KnownType arg = stack(params[0].getSort(), 0);
+                                                defaults = () -> (casted.type.getSort() == VOID_SORT)? arg : casted;
+
+                                                final int index = ops.size();
+                                                queue(() -> cast(mv, arg, returns));
+                                                queue(() -> mv.visitFieldInsn((virtual == 0)? PUTSTATIC : PUTFIELD, this.owner.type.getInternalName(), this.name, returns.type.getDescriptor()));
+
+                                                switch (name) {
+                                                    case "getAndSet":
+                                                        ops.add(virtual, () -> {
+                                                            final int size;
+                                                            if ((size = size(casted)) != VOID_SORT) {
+                                                                if (virtual == 0) {
+                                                                    mv.visitFieldInsn(GETSTATIC, this.owner.type.getInternalName(), this.name, returns.type.getDescriptor());
+                                                                } else {
+                                                                    mv.visitInsn(DUP);
+                                                                    mv.visitFieldInsn(GETFIELD, this.owner.type.getInternalName(), this.name, returns.type.getDescriptor());
+                                                                    if (size(returns) != 1) { // use switch(pair()) instead if new data categories are added
+                                                                        if (size != 1) {
+                                                                            mv.visitInsn(DUP2_X1);
+                                                                            mv.visitInsn(POP2);
+                                                                            return;
+                                                                        }
+                                                                        cast(mv, returns, casted);
+                                                                        casted = returns;
+                                                                    }
+                                                                    mv.visitInsn(SWAP);
+                                                                }
+                                                            } else {// disable casting
+                                                                casted = returns;
+                                                            }
+                                                        });
+                                                        break;
+                                                    case "set":
+                                                        casted = arg;
+                                                        defaults = () -> arg;
+                                                        ops.add(() -> returns = arg);
+                                                        ops.add(index, () -> dup(arg));
+                                                        break;
+                                                    case "setAndGet":
+                                                        ops.add(index + 1, () -> dup(returns));
+                                                        break;
+                                                    default:
+                                                        throw exception("Unknown write operation [." + name + "()]");
+                                                }
+                                                break;
+                                            default:
+                                                throw exception("Too many arguments for field access");
+                                        }
+                                        ldc = null;
+                                        state = 0x06;
+                                        return;
                                 }
                             } else if (name.equals("valueOf") && params.length == 1 && params[0].getSort() < ARRAY_SORT && sort(Type.getObjectType(owner)) < ARRAY_SORT) {
                                 super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
@@ -826,6 +888,24 @@ final class InvocationVisitor extends AnalyzerAdapter implements Linked<MethodVi
                             }
                         }
                         super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
+                    }
+
+                    private void dup(KnownType type) {
+                        if (casted.type.getSort() != VOID_SORT) {
+                            if (virtual == 0) {
+                                mv.visitInsn((size(type) == 2)? DUP2 : DUP);
+                            } else {
+                                mv.visitInsn((size(type) == 2)? DUP2_X1 : DUP_X1);
+                            }
+                        } else {// disable casting
+                            casted = type;
+                        }
+                    }
+
+                    private void statement() {
+                        if (casted.type.getSort() == VOID_SORT) {
+                            throw exception("Invocation does not result in a statement");
+                        }
                     }
 
                     @Override

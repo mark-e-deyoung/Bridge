@@ -1,6 +1,6 @@
 package bridge.mvn;
 
-import bridge.asm.Linked;
+import bridge.asm.LinkedVisitor;
 import bridge.asm.QueuedVisitor;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Label;
@@ -15,14 +15,15 @@ import java.util.LinkedList;
 import static org.objectweb.asm.Opcodes.*;
 
 public final class ForkVisitor extends ClassVisitor {
-    static final byte NO_LINE_NUMBERS    = 0b00001;
-    static final byte NO_MODULE_VERSIONS = 0b00010;
-    static final byte NO_SOURCE_NAMES    = 0b00100;
-    static final byte NO_SOURCE_EXT      = 0b01000;
-    static final byte NO_NAMED_LOCALS    = 0b10000;
+    static final byte NO_LINE_NUMBERS    = 0b000001;
+    static final byte NO_MODULE_VERSIONS = 0b000010;
+    static final byte NO_SOURCE_NAMES    = 0b000100;
+    static final byte NO_SOURCE_EXT      = 0b001000;
+    static final byte NO_NAMED_LOCALS    = 0b010000;
+    static final byte NO_NAMED_PARAMS    = 0b100000;
 
     private final BridgeVisitor caller;
-    private final boolean names, lines;
+    private final boolean params, locals, lines;
     private final int version, flags;
 
     ForkVisitor(ClassVisitor delegate, BridgeVisitor caller, int version, int flags) {
@@ -30,7 +31,8 @@ public final class ForkVisitor extends ClassVisitor {
         this.caller = caller;
         this.version = version;
         this.flags = flags;
-        this.names = (flags & NO_NAMED_LOCALS) == 0;
+        this.params = (flags & NO_NAMED_PARAMS) == 0;
+        this.locals = (flags & NO_NAMED_LOCALS) == 0;
         this.lines = (flags & NO_LINE_NUMBERS) == 0;
     }
 
@@ -52,7 +54,7 @@ public final class ForkVisitor extends ClassVisitor {
         return new Fork(name, new Clean(super.visitMethod(access, name, descriptor, signature, exceptions)));
     }
 
-    private final class Fork extends MethodVisitor implements Linked<MethodVisitor> {
+    private final class Fork extends MethodVisitor implements LinkedVisitor {
         private final String method;
         private int line;
 
@@ -108,15 +110,14 @@ public final class ForkVisitor extends ClassVisitor {
         @Override
         public void visitFieldInsn(int opcode, String owner, String name, String descriptor) {
             if (opcode == GETSTATIC && "bridge/Invocation".equals(owner) && name.equals("LANGUAGE_LEVEL")) {
-                final class LANGUAGE_LEVEL extends MethodVisitor implements Linked<MethodVisitor> {
+                final class LANGUAGE_LEVEL extends MethodVisitor implements LinkedVisitor {
                     private MethodVisitor parent;
                     private int version;
 
-                    @SuppressWarnings("unchecked")
                     private LANGUAGE_LEVEL(MethodVisitor delegate) {
                         super(ASM9, delegate);
-                        if (delegate instanceof Linked) {
-                            ((Linked<MethodVisitor>) delegate).setParent(this);
+                        if (delegate instanceof LinkedVisitor) {
+                            ((LinkedVisitor) delegate).setParent(this);
                         }
                     }
 
@@ -155,7 +156,6 @@ public final class ForkVisitor extends ClassVisitor {
                         }
                     }
 
-                    @SuppressWarnings("unchecked")
                     @Override
                     public void visitJumpInsn(int opcode, Label label) {
                         switch (opcode) {
@@ -181,9 +181,7 @@ public final class ForkVisitor extends ClassVisitor {
                                 super.visitJumpInsn(opcode, label);
                                 return;
                         }
-                        if (((Linked<MethodVisitor>) parent).setDelegate(mv) instanceof Linked) {
-                            ((Linked<MethodVisitor>) mv).setParent(parent);
-                        }
+                        if (((LinkedVisitor) parent).setDelegate(mv) instanceof LinkedVisitor) ((LinkedVisitor) mv).setParent(parent);
                     }
 
                     @Override
@@ -295,12 +293,12 @@ public final class ForkVisitor extends ClassVisitor {
 
         @Override
         public void visitParameter(String name, int access) {
-            if (names) super.visitParameter(name, access);
+            if (params) super.visitParameter(name, access);
         }
 
         @Override
         public void visitLocalVariable(String name, String descriptor, String signature, Label start, Label end, int index) {
-            if (names) {
+            if (locals) {
                 final Block block = (end.info != null)? (Block) end.info : new Block();
                 if (block.attrs == null) block.attrs = new LinkedList<>();
                 block.attrs.add(() -> {

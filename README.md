@@ -6,7 +6,7 @@ Bridge is a post-compile maven plugin that injects new advanced functionality in
 * [**Unsafe native referencing of classes, constructors, methods, &amp; fields**](https://github.com/ME1312/Bridge/wiki/Features#invocations) *with* `Invocation`
 * [**Unrestricted `goto` execution jumping**](https://github.com/ME1312/Bridge/wiki/Features#jumps) *with* `Label` &amp; `Jump`
 * [**Automatic multi-release class forking**](https://github.com/ME1312/Bridge/wiki/Features#forks) *with* `Invocation.LANGUAGE_LEVEL`
-* [**Native unchecked exception throwing &amp; handling**](https://github.com/ME1312/Bridge/wiki/Features#unchecked-exceptions) *with* `Unchecked`
+* [**Native unchecked casting, throwing, &amp; handling**](https://github.com/ME1312/Bridge/wiki/Features#unchecked) *with* `Unchecked`
 * [**Post-compile class hierarchy modification**](https://github.com/ME1312/Bridge/wiki/Features#type-adoption) *with* `@Adopt`
 * [**Public implementation hiding**](https://github.com/ME1312/Bridge/wiki/Features#appending-the-synthetic-modifier) *with* `@Synthetic`
 * [**Optional stripping of debug metadata**](https://github.com/ME1312/Bridge/wiki/Features#removing-debug-metadata)

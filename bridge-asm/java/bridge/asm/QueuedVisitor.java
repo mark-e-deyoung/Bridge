@@ -18,12 +18,8 @@ public class QueuedVisitor extends MethodVisitor {
         super(api, delegate);
     }
 
-    public void queue(Runnable op) {
-        ops.add(op);
-    }
-
     public void visitOperation(int opcode, Runnable op) {
-        queue(op);
+        ops.add(op);
     }
 
     // --- only notification posters beyond this point ---
@@ -134,8 +130,19 @@ public class QueuedVisitor extends MethodVisitor {
     }
 
     @Override
+    @Deprecated
+    @SuppressWarnings({"DeprecatedIsStillUsed", "deprecation"})
+    public void visitMethodInsn(int opcode, String owner, String name, String descriptor) {
+        visitMethodInsn((api < ASM5)? SOURCE_DEPRECATED | opcode : opcode, owner, name, descriptor, opcode == INVOKEINTERFACE);
+    }
+
+    @Override
     public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
-        visitOperation(opcode, () -> super.visitMethodInsn(opcode, owner, name, descriptor, isInterface));
+        if (api < ASM5 && (opcode & SOURCE_DEPRECATED) == 0 && (opcode == INVOKEINTERFACE) == isInterface) {
+            visitMethodInsn(opcode, owner, name, descriptor);
+            return;
+        }
+        visitOperation(opcode & ~SOURCE_MASK, () -> super.visitMethodInsn(opcode, owner, name, descriptor, isInterface));
     }
 
     @Override

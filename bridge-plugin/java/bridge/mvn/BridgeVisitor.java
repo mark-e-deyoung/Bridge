@@ -21,7 +21,7 @@ final class BridgeVisitor extends ClassVisitor {
     BridgeData data;
     HashMap<Integer, Boolean> forks = new HashMap<>();
     String adopt, name, src = "Unknown Source";
-    int version, bridges, invocations, adjustments;
+    int version, bridges, invocations, adjustments, removals;
 
     BridgeVisitor(ClassVisitor delegate, TypeMap types) {
         super(ASM9, delegate);

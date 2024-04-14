@@ -7,6 +7,13 @@ public class InvocationTest {
         Invocations.SL01();
         Invocations.SL02();
 
+        Invocations.SI01();
+        Invocations.SI02();
+        Invocations.SI03();
+        Invocations.SI04();
+        Invocations.SI05();
+        Invocations.SI06();
+
         Invocations.SF01();
         Invocations.SF02();
         Invocations.SF03();
@@ -47,12 +54,12 @@ public class InvocationTest {
         Invocations.VL01();
         Invocations.VL02();
 
-        Invocations.VC01();
-        Invocations.VC02();
-        Invocations.VC03();
-        Invocations.VC04();
-        Invocations.VC05();
-        Invocations.VC06();
+        Invocations.VI01();
+        Invocations.VI02();
+        Invocations.VI03();
+        Invocations.VI04();
+        Invocations.VI05();
+        Invocations.VI06();
 
         Invocations.VF01();
         Invocations.VF02();

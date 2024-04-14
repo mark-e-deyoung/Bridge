@@ -2,8 +2,12 @@ package bridge.mvn;
 
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.Type;
+import org.objectweb.asm.tree.AnnotationNode;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
@@ -11,7 +15,7 @@ import static org.objectweb.asm.Opcodes.ASM9;
 
 final class BridgeAnnotation extends AnnotationVisitor {
     private static final int MAX_ARITY = 255;
-    private Map<String, Repeater> annotations;
+    private Map<AnnotationNode, Boolean> annotations;
     private final int access;
     private int $access, fromIndex, toIndex, length = MAX_ARITY;
     private final String name, desc;
@@ -96,50 +100,10 @@ final class BridgeAnnotation extends AnnotationVisitor {
 
     @Override
     public AnnotationVisitor visitAnnotation(String name, String desc) {
+        final AnnotationNode annotation;
         if (annotations == null) annotations = new LinkedHashMap<>();
-        return annotations.put(desc, new Repeater(new LinkedList<>()));
-    }
-
-    private final static class Repeater extends AnnotationVisitor {
-        private final List<Runnable> queue;
-
-        private Repeater(List<Runnable> queue) {
-            super(ASM9);
-            this.queue = queue;
-        }
-
-        private void visit(AnnotationVisitor av) {
-            super.av = av;
-        }
-
-        @Override
-        public void visit(String name, Object value) {
-            queue.add(() -> super.visit(name, value));
-        }
-
-        @Override
-        public void visitEnum(String name, String descriptor, String value) {
-            queue.add(() -> super.visitEnum(name, descriptor, value));
-        }
-
-        @Override
-        public AnnotationVisitor visitAnnotation(String name, String descriptor) {
-            Repeater av = new Repeater(queue);
-            queue.add(() -> av.av = super.visitAnnotation(name, descriptor));
-            return av;
-        }
-
-        @Override
-        public AnnotationVisitor visitArray(String name) {
-            Repeater av = new Repeater(queue);
-            queue.add(() -> av.av = super.visitArray(name));
-            return av;
-        }
-
-        @Override
-        public void visitEnd() {
-            queue.add(super::visitEnd);
-        }
+        annotations.put(annotation = new AnnotationNode(desc), Boolean.TRUE);
+        return annotation;
     }
 
     @Override
@@ -155,9 +119,9 @@ final class BridgeAnnotation extends AnnotationVisitor {
         final int fromIndex, toIndex, length;
         final String[] ex;
         final Type returns;
-        private final Map<String, Repeater> annotations;
+        private final Map<AnnotationNode, Boolean> annotations;
 
-        private Data(int access, String name, String descriptor, int fromIndex, int toIndex, int length, String[] exceptions, String signature, Type returns, Map<String, Repeater> annotations) {
+        private Data(int access, String name, String descriptor, int fromIndex, int toIndex, int length, String[] exceptions, String signature, Type returns, Map<AnnotationNode, Boolean> annotations) {
             this.access = access;
             this.name = name;
             this.desc = descriptor;
@@ -171,10 +135,9 @@ final class BridgeAnnotation extends AnnotationVisitor {
         }
 
         void annotate(BiFunction<String, Boolean, AnnotationVisitor> code) {
-            for (Map.Entry<String, Repeater> entry : annotations.entrySet()) {
-                Repeater annotation = entry.getValue();
-                annotation.visit(code.apply(entry.getKey(), Boolean.TRUE));
-                for (Runnable op : annotation.queue) op.run();
+            for (Map.Entry<AnnotationNode, Boolean> entry : annotations.entrySet()) {
+                final AnnotationNode annotation;
+                (annotation = entry.getKey()).accept(code.apply(annotation.desc, entry.getValue()));
             }
         }
     }
