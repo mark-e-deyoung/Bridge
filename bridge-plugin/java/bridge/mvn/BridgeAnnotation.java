@@ -15,34 +15,35 @@ import static org.objectweb.asm.Opcodes.ASM9;
 
 final class BridgeAnnotation extends AnnotationVisitor {
     private static final int MAX_ARITY = 255;
-    private Map<AnnotationNode, Boolean> annotations;
-    private final int access;
-    private int $access, fromIndex, toIndex, length = MAX_ARITY;
-    private final String name, desc;
-    private String $name, $desc, sign;
-    private final Type returns;
-    private Type $returns;
-    private String[] ex;
-    private final Consumer<Data> action;
+    private final int ACCESS;
+    private final String NAME, DESC;
+    private final Type RETURNS;
+    private final String[] EX;
+    private final Consumer<Data> ACTION;
 
+    private Map<AnnotationNode, Boolean> annotations;
+    private int access, fromIndex, toIndex, length = MAX_ARITY;
+    private String name, desc, sign;
+    private Type returns;
+    private String[] ex;
 
     BridgeAnnotation(int access, String name, String descriptor, String[] exceptions, Type returns, Consumer<Data> action) {
         super(ASM9);
-        this.access = $access = access;
-        this.name = $name = name;
-        this.desc = $desc = descriptor;
-        this.ex = exceptions;
-        this.returns = $returns = returns;
-        this.action = action;
+        this.ACCESS = this.access = access;
+        this.NAME = this.name = name;
+        this.DESC = this.desc = descriptor;
+        this.EX = this.ex = exceptions;
+        this.RETURNS = this.returns = returns;
+        this.ACTION = action;
     }
 
     @Override
     public void visit(String name, Object value) {
         if ("access".equals(name)) {
             int access = (int) value;
-            $access = (access < 0)? $access & access : access;
+            this.access = (access < 0)? this.access & access : access;
         } else if ("name".equals(name)) {
-            $name = value.toString();
+            this.name = value.toString();
         } else if ("fromIndex".equals(name)) {
             if ((fromIndex = Math.min((int) value, MAX_ARITY)) < 0) fromIndex = 0;
         } else if ("toIndex".equals(name)) {
@@ -52,9 +53,9 @@ final class BridgeAnnotation extends AnnotationVisitor {
         } else if ("signature".equals(name)) {
             sign = value.toString();
         } else if ("returns".equals(name)) {
-            String desc = $desc, returns = value.toString();
-            $returns = Type.getType(returns);
-            $desc = new StringBuilder().append(desc).replace(desc.indexOf(')') + 1, desc.length(), returns).toString();
+            String desc = this.desc, returns = value.toString();
+            this.returns = Type.getType(returns);
+            this.desc = new StringBuilder().append(desc).replace(desc.indexOf(')') + 1, desc.length(), returns).toString();
         }
     }
 
@@ -71,7 +72,7 @@ final class BridgeAnnotation extends AnnotationVisitor {
 
                 @Override
                 public void visitEnd() {
-                    $desc = desc.append(')').append($returns.getDescriptor()).toString();
+                    BridgeAnnotation.this.desc = desc.append(')').append(returns.getDescriptor()).toString();
                 }
             };
         } else if ("exceptions".equals(name)) {
@@ -92,7 +93,7 @@ final class BridgeAnnotation extends AnnotationVisitor {
             return new AnnotationVisitor(ASM9) {
                 @Override
                 public AnnotationVisitor visitAnnotation(String name, String descriptor) {
-                    return new BridgeAnnotation(access, BridgeAnnotation.this.name, desc, ex, returns, action);
+                    return new BridgeAnnotation(ACCESS, NAME, DESC, EX, RETURNS, ACTION);
                 }
             };
         }
@@ -108,8 +109,8 @@ final class BridgeAnnotation extends AnnotationVisitor {
 
     @Override
     public void visitEnd() {
-        if (!$name.equals(name) || !$desc.equals(desc)) {
-            action.accept(new Data($access, $name, $desc, fromIndex, toIndex, length, ex, sign, $returns, annotations));
+        if (!NAME.equals(name) || !DESC.equals(desc)) {
+            ACTION.accept(new Data(access, name, desc, fromIndex, toIndex, length, ex, sign, returns, annotations));
         }
     }
 

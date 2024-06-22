@@ -2,6 +2,7 @@ package bridge.objects;
 
 import bridge.Adopt;
 import bridge.Bridge;
+import bridge.Invocation;
 import bridge.Synthetic;
 
 @Adopt(parent = Super.class, interfaces = Adoptable.class)
@@ -36,7 +37,7 @@ class Dummy extends Jester {
     @Bridge(params = {boolean.class, long.class, CharSequence.class})
     @Bridge(params = {boolean.class, long.class, CharSequence.class}, returns = Void.class)
     @Bridge(params = {long.class}, toIndex = 1, returns = Void.class)
-    long v_method(final boolean THROW, final long VALUE) throws NonException {
+    static long s_method(final boolean THROW, final long VALUE) throws NonException {
         if (THROW) throw new NonException();
         return VALUE;
     }
@@ -50,8 +51,70 @@ class Dummy extends Jester {
     @Bridge(params = {boolean.class, long.class, CharSequence.class})
     @Bridge(params = {boolean.class, long.class, CharSequence.class}, returns = Void.class)
     @Bridge(params = {long.class}, toIndex = 1, returns = Void.class)
-    static long s_method(final boolean THROW, final long VALUE) throws NonException {
+    long v_method(final boolean THROW, final long VALUE) throws NonException {
         if (THROW) throw new NonException();
         return VALUE;
+    }
+
+    @Override
+    public float superInterface(double value) {
+        return new Invocation(Adoptable.class, this).ofMethod("superInterface").with(value).invoke();
+    }
+
+    @Override
+    public float superClass(double value) {
+        return new Invocation(Super.class, this).ofMethod("superClass").with(value).invoke();
+    }
+
+    public static int privateNestInterface(long value) {
+        return new Invocation(Interface.class, new Interface() {}).ofMethod("secret").with(value).invoke();
+    }
+
+    public static int privateNestClass(long value) {
+        return new Invocation(Class.class, new Class()).ofMethod("secret").with(value).invoke();
+    }
+
+    public static int privateStaticNestInterface(long value) {
+        return new Invocation(Interface.class).ofMethod("secrets").with(value).invoke();
+    }
+
+    public static int privateStaticNestClass(long value) {
+        return new Invocation(Class.class).ofMethod("secrets").with(value).invoke();
+    }
+
+    private interface Interface {
+        private int secret(long value) {
+            return new Invocation(Interface.class).ofMethod("secrets").with(value).invoke();
+        }
+
+        private static int secrets(long value) {
+            return (int) value;
+        }
+    }
+
+    @SuppressWarnings("InnerClassMayBeStatic")
+    private static class Class {
+        private int secret(long value) {
+            return new Invocation(Class.class).ofMethod("secrets").with(value).invoke();
+        }
+
+        private static int secrets(long value) {
+            return (int) value;
+        }
+    }
+
+    // TODO integrate the following into the test suite with method invocations
+    public static void main(String[] args) {
+        Dummy dummy = new Dummy(null);
+        System.out.println(dummy.superInterface(1));
+        System.out.println(dummy.superClass(2));
+        System.out.println(dummy.privateInterface(3));
+        System.out.println(dummy.privateClass(4));
+        System.out.println(Dummy.privateNestInterface(5));
+        System.out.println(Dummy.privateNestClass(6));
+        System.out.println(Dummy.privateStaticNestInterface(7));
+        System.out.println(Dummy.privateStaticNestClass(8));
+        System.out.println();
+        System.out.println("Success!");
     }
 }

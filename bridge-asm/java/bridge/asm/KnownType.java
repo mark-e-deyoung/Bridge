@@ -29,16 +29,7 @@ public class KnownType {
         } else if (loaded != Object.class && !loaded.isPrimitive()) {
             this.extended = types.get(Object.class);
         }
-
-        final Class<?>[] interfaces;
-        if ((interfaces = loaded.getInterfaces()).length != 0) {
-            final KnownType[] implemented = this.implemented = new KnownType[interfaces.length];
-            for (int i = 0, length = interfaces.length; i != length;) {
-                implemented[i] = types.get(interfaces[i++]);
-            }
-        } else {
-            this.implemented = EMPTY;
-        }
+        this.implemented = types.get(loaded.getInterfaces());
     }
 
     public int hashCode() {
@@ -46,19 +37,27 @@ public class KnownType {
     }
 
     public boolean equals(Object type) {
-        if (this == type) {
-            return true;
-        } else if (type instanceof KnownType) {
-            return ((KnownType) type).type.equals(this.type);
-        } else if (type instanceof Type) {
-            return type.equals(this.type);
-        } else if (type instanceof Class) {
-            return Type.getType((Class<?>) type).equals(this.type);
-        } else if (type instanceof CharSequence) {
-            return type.equals(this.type.getDescriptor());
-        } else {
-            return false;
-        }
+        return type == this || (type instanceof KnownType && ((KnownType) type).type.equals(this.type));
+    }
+
+    public boolean represents(KnownType type) {
+        return type == this || (type != null && type.type.equals(this.type));
+    }
+
+    public boolean represents(Class<?> loaded) {
+        return loaded != null && Type.getType(loaded).equals(this.type);
+    }
+
+    public boolean represents(Type type) {
+        return this.type.equals(type);
+    }
+
+    public boolean represents(String type) {
+        return type != null && Type.getType(type).equals(this.type);
+    }
+
+    public boolean representsClass(String name) {
+        return name != null && Type.getObjectType(name).equals(this.type);
     }
 
     public Object data() {

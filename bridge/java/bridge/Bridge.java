@@ -12,7 +12,7 @@ import static org.objectweb.asm.Opcodes.*;
  * @implNote Usages of this annotation are counted as {@code bridges}.
  */
 @Repeatable(Bridges.class)
-@Target({ CONSTRUCTOR, METHOD, FIELD })
+@Target({CONSTRUCTOR, METHOD, FIELD})
 public @interface Bridge {
 
     /**

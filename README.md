@@ -1,7 +1,7 @@
 # Bridge ASM
 [![Build Status](https://dev.me1312.net/jenkins/job/Bridge/badge/icon)](https://dev.me1312.net/jenkins/job/Bridge/)
 [![Build Verison](https://img.shields.io/badge/dynamic/xml.svg?label=build&url=https%3A%2F%2Fdev.me1312.net%2Fmaven%2Fnet%2FME1312%2FASM%2Fbridge-plugin%2Fmaven-metadata.xml&query=%2F%2Fversioning%2Frelease&colorB=blue)](https://dev.me1312.net/jenkins/job/Bridge/)<br><br>
-Bridge is a post-compile maven plugin that injects new advanced functionality into the Java language despite using existing semantics. Currently, we add the following features:
+Bridge is a post-compile maven plugin that injects new advanced functionality into the Java language using existing semantics. Currently, we add the following features:
 * [**Redirection of constructors, methods, &amp; fields**](https://github.com/ME1312/Bridge/wiki/Features#bridges) *with* `@Bridge`
 * [**Unsafe native referencing of classes, constructors, methods, &amp; fields**](https://github.com/ME1312/Bridge/wiki/Features#invocations) *with* `Invocation`
 * [**Unrestricted `goto` execution jumping**](https://github.com/ME1312/Bridge/wiki/Features#jumps) *with* `Label` &amp; `Jump`
@@ -11,7 +11,7 @@ Bridge is a post-compile maven plugin that injects new advanced functionality in
 * [**Public implementation hiding**](https://github.com/ME1312/Bridge/wiki/Features#appending-the-synthetic-modifier) *with* `@Synthetic`
 * [**Optional stripping of debug metadata**](https://github.com/ME1312/Bridge/wiki/Features#removing-debug-metadata)
 
-*This project could always benefit from your submission of [additional automated testing](https://github.com/ME1312/Bridge/issues/1)!*
+*This project can always benefit from your submission of [additional automated testing](https://github.com/ME1312/Bridge/issues/1)!*
 <br><br>
 
 ```xml

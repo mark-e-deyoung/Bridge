@@ -158,11 +158,13 @@ public final class TypeMap implements Cloneable {
     }
 
     public boolean contains(KnownType type) {
-        return map.containsKey(type.type);
+        if (type != null) return map.containsKey(type.type);
+        return map.containsKey(null);
     }
 
     public boolean contains(Class<?> loaded) {
-        return map.containsKey(Type.getType(loaded));
+        if (loaded != null) return map.containsKey(Type.getType(loaded));
+        return map.containsKey(null);
     }
 
     public boolean contains(Type type) {
@@ -170,11 +172,13 @@ public final class TypeMap implements Cloneable {
     }
 
     public boolean contains(String type) {
-        return map.containsKey(Type.getType(type));
+        if (type != null) return map.containsKey(Type.getType(type));
+        return map.containsKey(null);
     }
 
     public boolean containsClass(String name) {
-        return map.containsKey(Type.getObjectType(name));
+        if (name != null) return map.containsKey(Type.getObjectType(name));
+        return map.containsKey(null);
     }
 
     public Collection<KnownType> values() {

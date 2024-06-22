@@ -11,7 +11,7 @@ import static java.lang.annotation.ElementType.*;
  * @implNote Usages of this annotation are counted as {@code adjustments}.
  */
 @Documented
-@Target({ TYPE, CONSTRUCTOR, METHOD, FIELD })
+@Target({TYPE, CONSTRUCTOR, METHOD, FIELD})
 public @interface Synthetic {
 
 }

@@ -531,6 +531,12 @@ final class InvocationVisitor extends AnalyzerAdapter implements LinkedVisitor {
                                 ldi = ops.size();
                                 ldc = new Object() {
                                     @Override
+                                    @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
+                                    public boolean equals(Object object) {
+                                        return object == null;
+                                    }
+
+                                    @Override
                                     public String toString() {
                                         throw exception("Illegal null invocation constant");
                                     }
@@ -571,22 +577,27 @@ final class InvocationVisitor extends AnalyzerAdapter implements LinkedVisitor {
                     }
 
                     private KnownType consume() {
+                        final KnownType type;
                         final Object ldc;
                         if ((ldc = this.ldc) == null) throw exception("Illegal dynamic invocation constant");
                         this.ops.remove(ldi);
                         this.ldc = null;
                         if (ldc instanceof KnownType) {
-                            return (KnownType) ldc;
+                            type = (KnownType) ldc;
                         } else if (ldc instanceof Type) {
-                            return types.load((Type) ldc);
+                            type = types.load((Type) ldc);
                         } else {
                             final String str;
-                            if ((str = ldc.toString().replace('.', '/')).length() != 0) {
-                                return types.loadClass(str);
+                            if ((str = ldc.toString()).length() != 0) {
+                                type = types.loadClass(str.replace('.', '/'));
                             } else {
                                 throw exception("Illegal empty invocation constant");
                             }
                         }
+                        if (type.isArray() && ((ArrayType) type).root.type.getSort() == VOID_SORT) {
+                            throw exception("Attempted use of void array");
+                        }
+                        return type;
                     }
 
                     private KnownType stack(int sort, int index) {
@@ -711,7 +722,7 @@ final class InvocationVisitor extends AnalyzerAdapter implements LinkedVisitor {
                                                     this.params.add(consume().type);
                                                 } else {
                                                     final KnownType param, arg;
-                                                    if ((param = consume()).type == VOID_TYPE) {
+                                                    if ((param = consume()).type.getSort() == VOID_SORT) {
                                                         throw exception("Attempted use of void argument");
                                                     }
                                                     final Type primitive;
@@ -763,7 +774,7 @@ final class InvocationVisitor extends AnalyzerAdapter implements LinkedVisitor {
                                                         final int depth;
                                                         switch (depth = this.params.size()) {
                                                             case 0:
-                                                                throw exception("Attempted array creation with undefined length");
+                                                                throw exception("Attempted creation of array with undefined length");
                                                             case 1:
                                                                 final Type type;
                                                                 switch ((type = ((ArrayType) this.owner).element.type).getSort()) {

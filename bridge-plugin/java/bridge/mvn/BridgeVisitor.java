@@ -62,10 +62,10 @@ final class BridgeVisitor extends ClassVisitor {
     }
 
     private final class Field extends FieldVisitor {
-        final int access;
-        final String name, desc;
-        final KnownType returns;
-        final Object value;
+        private final int access;
+        private final String name, desc;
+        private final KnownType returns;
+        private final Object value;
 
         private Field(int access, String name, String descriptor, String signature, Object value) {
             super(ASM9, BridgeVisitor.super.visitField(access, name, descriptor, signature, value));

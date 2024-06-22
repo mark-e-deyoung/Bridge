@@ -5,24 +5,17 @@ import bridge.Jump;
 import bridge.Label;
 import bridge.Unchecked;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @SuppressWarnings("UnusedReturnValue")
 class Invocations {
 
     private static final Object alternate = new Dummy(null);
     private static final Dummy instance = new Dummy(null);
-    private static final Super generic = Dummy.s_obj = instance.v_obj = instance;
+    private static final Super generic = Dummy.s_obj = instance.v_obj = new Super(null);
+    private static final Integer zero = 0;
     private static final short label = 420;
-
-    // unchecked exception handling test
-    static void THRW() {
-        try {
-            Unchecked.<NonException>check();
-            Jester.sneak();
-            assert false;
-        } catch (NonException e) {
-          //return;
-        }
-    }
 
     // jump & label test
     @SuppressWarnings({"ConstantConditions", "ThrowableNotThrown"})
@@ -35,204 +28,259 @@ class Invocations {
         assert i == 5;
     }
 
+    // unchecked casting test
+    static void CAST() {
+        HashMap<?, ?> a = Unchecked.cast(new HashMap<>());
+        Map<Object, Object> b = Unchecked.cast(a);
+        HashMap<?, ?> c = Unchecked.cast(b);
+        assert c != null;
+    }
+
+    // unchecked exception handling test
+    static void THRW() {
+        try {
+            Unchecked.<NonException>check();
+            Jester.sneak();
+            assert false;
+        } catch (NonException e) {
+          //return;
+        }
+    }
+
+
+
     // static class literals, test 1
-    static void SL01() {
+    static void SL0A() {
         assert new Invocation(Dummy.class).ofClassLiteral() == Dummy.class;
     }
 
     // static class literals, test 2
-    static void SL02() {
+    static void SL0B() {
         assert new Invocation("bridge.objects.Dummy").ofClassLiteral() == Dummy.class;
     }
 
 
 
     // static type checking, test 1
-    static void SI01() {
+    static void SI0A() {
         assert new Invocation(Dummy.class).ofInstanceOf(Dummy.class);
     }
 
     // static type checking, test 2
-    static void SI02() {
+    static void SI0B() {
         assert new Invocation(Dummy.class).ofInstanceOf(Super.class);
     }
 
     // static type checking, test 3
-    static void SI03() {
-        assert !new Invocation(Dummy.class).ofInstanceOf(Jester.class);
+    static void SI0C() {
+        assert new Invocation(Dummy.class).ofInstanceOf(Adoptable.class);
     }
 
     // static type checking, test 4
-    static void SI04() {
-        assert !new Invocation(Void.class).ofInstanceOf(Invocations.class);
+    static void SI0D() {
+        assert !new Invocation(Dummy.class).ofInstanceOf(Jester.class);
     }
 
     // static type checking, test 5
-    static void SI05() {
-        assert new Invocation(Dummy[][].class).ofInstanceOf(Object[].class);
+    static void SI0E() {
+        assert !new Invocation(Void.class).ofInstanceOf(Invocations.class);
     }
 
     // static type checking, test 6
-    static void SI06() {
+    static void SI0F() {
+        assert new Invocation(Dummy[][].class).ofInstanceOf(Object[].class);
+    }
+
+    // static type checking, test 7
+    static void SI0G() {
         assert !new Invocation(Dummy[][].class).ofInstanceOf(Super[].class);
     }
 
 
 
     // static fields, object get
-    static void SF01() {
+    static void SF0A() {
         assert new Invocation(Dummy.class).ofField(Super.class, "s_obj").get() == generic;
     }
 
     // static fields, object get-and-set, use
-    static void SF02() {
+    static void SF0B() {
         assert new Invocation(Dummy.class).ofField(Super.class, "s_obj").getAndSet(alternate) == generic;
     }
 
     // static fields, object get-and-set, store
-    static Super SF03() {
+    static void SF0C() {
         Super value = new Invocation(Dummy.class).ofField("s_obj").getAndSet(generic);
-        if (value != alternate) {
-            assert false;
-        }
-        return value;
+        assert value == alternate;
     }
 
     // static fields, object get-and-set, store-and-use
-    static Super SF04() {
+    @SuppressWarnings("AssertWithSideEffects")
+    static void SF0D() {
         Super value;
-        if ((value = new Invocation(Dummy.class).ofField("s_obj").getAndSet(alternate)) != generic) {
-            assert false;
-        }
-        return value;
+        assert (value = new Invocation(Dummy.class).ofField("s_obj").getAndSet(alternate)) == generic;
+    }
+
+    // static fields, object get-and-set, void
+    static void SF0E() {
+        new Invocation(Dummy.class).ofField("s_obj").getAndSet(generic);
     }
 
     // static fields, object set
-    static void SF05() {
-        assert new Invocation(Dummy.class).ofField("s_obj").set(generic) == generic;
+    static void SF0F() {
+        assert new Invocation(Dummy.class).ofField("bridge.objects.Super", "s_obj").set(alternate) == alternate;
     }
 
     // static fields, object set, void
-    static void SF06() {
-        new Invocation(Dummy.class).ofField("bridge.objects.Super", "s_obj").set(alternate);
+    static void SF0G() {
+        new Invocation(Dummy.class).ofField("s_obj").set(generic);
     }
 
     // static fields, object set-and-get
-    static void SF07() {
-        assert new Invocation(Dummy.class).ofField(Super.class, "s_obj").setAndGet(generic) == generic;
+    static void SF0H() {
+        assert new Invocation(Dummy.class).ofField(Super.class, "s_obj").setAndGet(alternate) == alternate;
+    }
+
+    // static fields, object set-and-get, void
+    static void SF0I() {
+        new Invocation(Dummy.class).ofField("s_obj").setAndGet(generic);
     }
 
 
     // static fields, category 1 primitive get
-    static void SF11() {
+    static void SF1A() {
         assert (short) new Invocation(Dummy.class).ofField("sp_x1").get() == 0;
     }
 
     // static fields, category 1 primitive get-and-set, 1-to-1
-    static void SF12() {
+    static void SF1B() {
         int constant = 1;
         assert (short) new Invocation(Dummy.class).ofField("sp_x1").getAndSet(constant) == 0;
     }
 
     // static fields, category 1 primitive get-and-set, 1-to-2
-    static void SF13() {
+    static void SF1C() {
         int constant = 0;
         assert (long) new Invocation(Dummy.class).ofField(short.class, "sp_x1").getAndSet(constant) == 1;
     }
 
     // static fields, category 1 primitive get-and-set, 1-to-reference
-    static void SF14() {
+    static void SF1D() {
         int constant = 1;
         assert ((Boolean) new Invocation(Dummy.class).ofField(Short.TYPE, "sp_x1").getAndSet(constant)).compareTo(Boolean.FALSE) == 0;
     }
 
-    // static fields, category 1 primitive set
-    static void SF15() {
+    // static fields, category 1 primitive get-and-set, 1-to-void
+    static void SF1E() {
         int constant = 0;
-        assert new Invocation(Dummy.class).ofField(short.class, "sp_x1").set(constant) == constant;
+        new Invocation(Dummy.class).ofField(short.class, "sp_x1").getAndSet(constant);
+    }
+
+    // static fields, category 1 primitive set
+    static void SF1F() {
+        int constant = 1;
+        assert new Invocation(Dummy.class).ofField(Short.TYPE, "sp_x1").set(constant) == constant;
     }
 
     // static fields, category 1 primitive set, void
-    static void SF16() {
-        int constant = 1;
-        new Invocation(Dummy.class).ofField(Short.TYPE, "sp_x1").set(constant);
+    static void SF1G() {
+        int constant = 0;
+        new Invocation(Dummy.class).ofField(short.class, "sp_x1").set(constant);
     }
 
     // static fields, category 1 primitive set-and-get
-    static void SF17() {
-        int constant = 0;
+    static void SF1H() {
+        int constant = 1;
         assert (short) new Invocation(Dummy.class).ofField("sp_x1").setAndGet(constant) == constant;
+    }
+
+    // static fields, category 1 primitive set-and-get, void
+    static void SF1I() {
+        int constant = 0;
+        new Invocation(Dummy.class).ofField(Short.TYPE, "sp_x1").setAndGet(constant);
     }
 
 
     // static fields, category 2 primitive get
-    static void SF21() {
+    static void SF2A() {
         assert (double) new Invocation(Dummy.class).ofField("sp_x2").get() == 0;
     }
 
     // static fields, category 2 primitive get-and-set, 2-to-2
-    static void SF22() {
+    static void SF2B() {
         float constant = 1;
         assert (double) new Invocation(Dummy.class).ofField("sp_x2").getAndSet(constant) == 0;
     }
 
     // static fields, category 2 primitive get-and-set, 2-to-1
-    static void SF23() {
+    static void SF2C() {
         float constant = 0;
         assert (int) new Invocation(Dummy.class).ofField(double.class, "sp_x2").getAndSet(constant) == 1;
     }
 
     // static fields, category 2 primitive get-and-set, 2-to-reference
-    static void SF24() {
+    static void SF2D() {
         float constant = 1;
         assert ((Boolean) new Invocation(Dummy.class).ofField(Double.TYPE, "sp_x2").getAndSet(constant)).compareTo(Boolean.FALSE) == 0;
     }
 
-    // static fields, category 2 primitive set
-    static void SF25() {
+    // static fields, category 2 primitive get-and-set, 2-to-void
+    static void SF2E() {
         float constant = 0;
-        assert new Invocation(Dummy.class).ofField(double.class, "sp_x2").set(constant) == constant;
+        new Invocation(Dummy.class).ofField(double.class, "sp_x2").getAndSet(constant);
+    }
+
+    // static fields, category 2 primitive set
+    static void SF2F() {
+        float constant = 1;
+        assert new Invocation(Dummy.class).ofField(Double.TYPE, "sp_x2").set(constant) == constant;
     }
 
     // static fields, category 2 primitive set, void
-    static void SF26() {
-        float constant = 1;
-        new Invocation(Dummy.class).ofField(Double.TYPE, "sp_x2").set(constant);
+    static void SF2G() {
+        float constant = 0;
+        new Invocation(Dummy.class).ofField(double.class, "sp_x2").set(constant);
     }
 
     // static fields, category 2 primitive set-and-get
-    static void SF27() {
-        float constant = 0;
+    static void SF2H() {
+        float constant = 1;
         assert (double) new Invocation(Dummy.class).ofField("sp_x2").setAndGet(constant) == constant;
+    }
+
+    // static fields, category 2 primitive set-and-get, void
+    static void SF2I() {
+        float constant = 0;
+        new Invocation(Dummy.class).ofField(Double.TYPE, "sp_x2").setAndGet(constant);
     }
 
 
 
     // object instantiation, test 1
-    static void SC01() {
-        assert new Invocation(Dummy.class).ofConstructor().invoke() != null;
+    static void SC0A() {
+        assert new Invocation(Dummy.class).ofConstructor().invoke() instanceof Dummy;
     }
 
     // object instantiation, test 2
-    static void SC02() {
+    static void SC0B() {
         boolean const1 = false;
         assert new Invocation(Dummy.class).ofConstructor()
                 .with((boolean) const1)
-                .invoke() != null;
+                .invoke() instanceof Dummy;
     }
 
     // object instantiation, test 3
-    static void SC03() {
+    static void SC0C() {
         boolean const1 = false;
         long const2 = 64;
         assert new Invocation(Dummy.class).ofConstructor()
                 .with((boolean) const1)
                 .with((long) const2)
-                .invoke() != null;
+                .invoke() instanceof Dummy;
     }
 
     // object instantiation, test 4
-    static void SC04() {
+    static void SC0D() {
         boolean const1 = false;
         int const2 = 64;
         String const3 = "";
@@ -240,11 +288,11 @@ class Invocations {
                 .with((boolean) const1)
                 .with((long) const2)
                 .with(CharSequence.class, const3)
-                .invoke() != null;
+                .invoke() instanceof Dummy;
     }
 
     // object instantiation, test 5
-    static void SC05() {
+    static void SC0E() {
         boolean const1 = false;
         int const2 = 64;
         String const3 = "";
@@ -261,7 +309,7 @@ class Invocations {
     }
 
     // object instantiation, test 6
-    static void SC06() {
+    static void SC0F() {
         boolean const1 = true;
         int const2 = 64;
         String const3 = "";
@@ -279,206 +327,326 @@ class Invocations {
     }
 
 
-    // array instantiation, test 1
-    static void SC11() {
-        assert ((int[]) new Invocation(int[].class).ofConstructor().with(false).invoke()).length == 0;
+    // boolean array instantiation
+    static void SC1A() {
+        assert new Invocation(boolean[].class).ofConstructor().with(false).invoke() instanceof boolean[];
     }
 
-    // array instantiation, test 2
-    static void SC12() {
-        assert ((Dummy[]) new Invocation(Dummy[].class).ofConstructor().with((char) 1).invoke()).length == 1;
+    // char array instantiation
+    static void SC1B() {
+        assert new Invocation(char[].class).ofConstructor().with('\u0000').invoke() instanceof char[];
     }
 
-    // array instantiation, test 3
-    static void SC13() {
-        assert ((short[][]) new Invocation(short[][].class).ofConstructor().with((byte) 3).invoke())[2] == null;
+    // byte array instantiation
+    static void SC1C() {
+        assert new Invocation(byte[].class).ofConstructor().with((byte) 0).invoke() instanceof byte[];
     }
 
-    // array instantiation, test 4
-    static void SC14() {
-        assert ((Dummy[][]) new Invocation(Dummy[][].class).ofConstructor().with((short) 1).invoke())[0] == null;
+    // short array instantiation
+    static void SC1D() {
+        assert new Invocation(short[].class).ofConstructor().with((short) 0).invoke() instanceof short[];
     }
 
-    // array instantiation, test 5
-    static void SC15() {
-        assert ((byte[][]) new Invocation(byte[][].class).ofConstructor().with((int) 1).with((float) 2).invoke())[0].length == 2;
+    // int array instantiation
+    static void SC1E() {
+        assert new Invocation(int[].class).ofConstructor().with(0).invoke() instanceof int[];
     }
 
-    // array instantiation, test 6
-    static void SC16() {
-        assert ((Dummy[][]) new Invocation(Dummy[][].class).ofConstructor().with((long) 2).with((double) 4).invoke())[1].length == 4;
+    // float array instantiation
+    static void SC1F() {
+        assert new Invocation(float[].class).ofConstructor().with(0F).invoke() instanceof float[];
+    }
+
+    // long array instantiation
+    static void SC1G() {
+        assert new Invocation(long[].class).ofConstructor().with(0L).invoke() instanceof long[];
+    }
+
+    // double array instantiation
+    static void SC1H() {
+        assert new Invocation(double[].class).ofConstructor().with(0D).invoke() instanceof double[];
+    }
+
+    // object array instantiation
+    static void SC1I() {
+        assert new Invocation(Dummy[].class).ofConstructor().with(zero).invoke() instanceof Dummy[];
+    }
+
+
+    // multi-dimensional array instantiation, test 1
+    @SuppressWarnings({"AssertWithSideEffects", "DataFlowIssue"})
+    static void SC2A() {
+        long[][] array;
+        assert (array = new Invocation(long[][].class).ofConstructor().with(1D).invoke()) instanceof long[][] && array[0] == null;
+    }
+
+    // multi-dimensional array instantiation, test 2
+    @SuppressWarnings({"AssertWithSideEffects", "DataFlowIssue"})
+    static void SC2B() {
+        Dummy[][] array;
+        assert (array = new Invocation(Dummy[][].class).ofConstructor().with(1D).invoke()) instanceof Dummy[][] && array[0] == null;
+    }
+
+    // multi-dimensional array instantiation, test 3
+    @SuppressWarnings({"AssertWithSideEffects", "DataFlowIssue"})
+    static void SC2C() {
+        double[][][] array;
+        assert (array = new Invocation(double[][][].class).ofConstructor().with(1D).invoke()) instanceof double[][][] && array[0] == null;
+    }
+
+    // multi-dimensional array instantiation, test 4
+    @SuppressWarnings({"AssertWithSideEffects", "DataFlowIssue"})
+    static void SC2D() {
+        Dummy[][][] array;
+        assert (array = new Invocation(Dummy[][][].class).ofConstructor().with(1D).invoke()) instanceof Dummy[][][] && array[0] == null;
+    }
+
+    // multi-dimensional array instantiation, test 5
+    @SuppressWarnings({"AssertWithSideEffects", "DataFlowIssue"})
+    static void SC2E() {
+        short[][] array;
+        assert (array = new Invocation(short[][].class).ofConstructor().with(1D).with(2F).invoke()) instanceof short[][] && array[0][1] == 0;
+    }
+
+    // multi-dimensional array instantiation, test 6
+    @SuppressWarnings({"AssertWithSideEffects", "DataFlowIssue"})
+    static void SC2F() {
+        Dummy[][] array;
+        assert (array = new Invocation(Dummy[][].class).ofConstructor().with(1D).with(2F).invoke()) instanceof Dummy[][] && array[0][1] == null;
+    }
+
+    // multi-dimensional array instantiation, test 7
+    @SuppressWarnings({"AssertWithSideEffects", "DataFlowIssue"})
+    static void SC2G() {
+        float[][][] array;
+        assert (array = new Invocation(float[][][].class).ofConstructor().with(1D).with(2F).invoke()) instanceof float[][][] && array[0][1] == null;
+    }
+
+    // multi-dimensional array instantiation, test 8
+    @SuppressWarnings({"AssertWithSideEffects", "DataFlowIssue"})
+    static void SC2H() {
+        Dummy[][][] array;
+        assert (array = new Invocation(Dummy[][][].class).ofConstructor().with(1D).with(2F).invoke()) instanceof Dummy[][][] && array[0][1] == null;
+    }
+
+    // multi-dimensional array instantiation, test 9
+    @SuppressWarnings({"AssertWithSideEffects", "DataFlowIssue"})
+    static void SC2I() {
+        byte[][][] array;
+        assert (array = new Invocation(byte[][][].class).ofConstructor().with(1D).with(2F).with(3L).invoke()) instanceof byte[][][] && array[0][1][2] == 0;
+    }
+
+    // multi-dimensional array instantiation, test X
+    @SuppressWarnings({"AssertWithSideEffects", "DataFlowIssue"})
+    static void SC2J() {
+        Dummy[][][] array;
+        assert (array = new Invocation(Dummy[][][].class).ofConstructor().with(1D).with(2F).with(3L).invoke()) instanceof Dummy[][][] && array[0][1][2] == null;
     }
 
 
 
     // instance class literals, test 1
-    static void VL01() {
+    static void VL0A() {
         assert new Invocation(instance).ofClassLiteral() == Dummy.class;
     }
 
     // instance class literals, test 2
-    static void VL02() {
-        assert new Invocation(generic).ofClassLiteral() == Dummy.class;
+    static void VL0B() {
+        assert new Invocation(alternate).ofClassLiteral() == Dummy.class;
     }
 
 
 
     // instance type checking, test 1
-    static void VI01() {
+    static void VI0A() {
         assert new Invocation(instance).ofInstanceOf(Dummy.class);
     }
 
     // instance type checking, test 2
-    static void VI02() {
+    static void VI0B() {
         assert new Invocation(instance).ofInstanceOf(Super.class);
     }
 
     // instance type checking, test 3
-    static void VI03() {
-        assert !new Invocation(instance).ofInstanceOf(Jester.class);
+    static void VI0C() {
+        assert new Invocation(instance).ofInstanceOf(Adoptable.class);
     }
 
     // instance type checking, test 4
-    static void VI04() {
-        assert !new Invocation((Object) null).ofInstanceOf(Invocations.class);
+    static void VI0D() {
+        assert !new Invocation(instance).ofInstanceOf(Jester.class);
     }
 
     // instance type checking, test 5
-    static void VI05() {
-        assert new Invocation(new Dummy[0][]).ofInstanceOf(Object[].class);
+    static void VI0E() {
+        assert !new Invocation((Object) null).ofInstanceOf(Invocations.class);
     }
 
     // instance type checking, test 6
-    static void VI06() {
+    static void VI0F() {
+        assert new Invocation(new Dummy[0][]).ofInstanceOf(Object[].class);
+    }
+
+    // instance type checking, test 7
+    static void VI0G() {
         assert !new Invocation(new Dummy[0][]).ofInstanceOf(Super[].class);
     }
 
 
 
     // instance fields, object get
-    static void VF01() {
+    static void VF0A() {
         assert new Invocation(instance).ofField(Super.class, "v_obj").get() == generic;
     }
 
     // instance fields, object get-and-set, use
-    static void VF02() {
+    static void VF0B() {
         assert new Invocation(instance).ofField(Super.class, "v_obj").getAndSet(alternate) == generic;
     }
 
     // instance fields, object get-and-set, store
-    static Super VF03() {
+    static void VF0C() {
         Super value = new Invocation(instance).ofField("v_obj").getAndSet(generic);
-        if (value != alternate) {
-            assert false;
-        }
-        return value;
+        assert value == alternate;
     }
 
     // instance fields, object get-and-set, store-and-use
-    static Super VF04() {
+    @SuppressWarnings("AssertWithSideEffects")
+    static void VF0D() {
         Super value;
-        if ((value = new Invocation(instance).ofField("v_obj").getAndSet(alternate)) != generic) {
-            assert false;
-        }
-        return value;
+        assert (value = new Invocation(instance).ofField("v_obj").getAndSet(alternate)) == generic;
+    }
+
+    // instance fields, object get-and-set, void
+    static void VF0E() {
+        new Invocation(instance).ofField("v_obj").getAndSet(generic);
     }
 
     // instance fields, object set
-    static void VF05() {
-        assert new Invocation(instance).ofField("v_obj").set(generic) == generic;
+    static void VF0F() {
+        assert new Invocation(instance).ofField("bridge.objects.Super", "v_obj").set(alternate) == alternate;
     }
 
     // instance fields, object set, void
-    static void VF06() {
-        new Invocation(instance).ofField("bridge.objects.Super", "v_obj").set(alternate);
+    static void VF0G() {
+        new Invocation(instance).ofField("v_obj").set(generic);
     }
 
     // instance fields, object set-and-get
-    static void VF07() {
-        assert new Invocation(instance).ofField(Super.class, "v_obj").setAndGet(generic) == generic;
+    static void VF0H() {
+        assert new Invocation(instance).ofField(Super.class, "v_obj").setAndGet(alternate) == alternate;
+    }
+
+    // instance fields, object set-and-get, void
+    static void VF0I() {
+        new Invocation(instance).ofField("v_obj").setAndGet(generic);
     }
 
 
     // instance fields, category 1 primitive get
-    static void VF11() {
+    static void VF1A() {
         assert (short) new Invocation(instance).ofField("vp_x1").get() == 0;
     }
 
     // instance fields, category 1 primitive get-and-set, 1-to-1
-    static void VF12() {
+    static void VF1B() {
         int constant = 1;
         assert (short) new Invocation(instance).ofField("vp_x1").getAndSet(constant) == 0;
     }
 
     // instance fields, category 1 primitive get-and-set, 1-to-2
-    static void VF13() {
+    static void VF1C() {
         int constant = 0;
         assert (long) new Invocation(instance).ofField(short.class, "vp_x1").getAndSet(constant) == 1;
     }
 
     // instance fields, category 1 primitive get-and-set, 1-to-reference
-    static void VF14() {
+    static void VF1D() {
         int constant = 1;
         assert ((Boolean) new Invocation(instance).ofField(Short.TYPE, "vp_x1").getAndSet(constant)).compareTo(Boolean.FALSE) == 0;
     }
 
-    // instance fields, category 1 primitive set
-    static void VF15() {
+    // instance fields, category 1 primitive get-and-set, 1-to-void
+    static void VF1E() {
         int constant = 0;
-        assert new Invocation(instance).ofField(short.class, "vp_x1").set(constant) == constant;
+        new Invocation(instance).ofField(short.class, "vp_x1").getAndSet(constant);
+    }
+
+    // instance fields, category 1 primitive set
+    static void VF1F() {
+        int constant = 1;
+        assert new Invocation(instance).ofField(Short.TYPE, "vp_x1").set(constant) == constant;
     }
 
     // instance fields, category 1 primitive set, void
-    static void VF16() {
-        int constant = 1;
-        new Invocation(instance).ofField(Short.TYPE, "vp_x1").set(constant);
+    static void VF1G() {
+        int constant = 0;
+        new Invocation(instance).ofField(short.class, "vp_x1").set(constant);
     }
 
     // instance fields, category 1 primitive set-and-get
-    static void VF17() {
-        int constant = 0;
+    static void VF1H() {
+        int constant = 1;
         assert (short) new Invocation(instance).ofField("vp_x1").setAndGet(constant) == constant;
+    }
+
+    // instance fields, category 1 primitive set-and-get, void
+    static void VF1I() {
+        int constant = 0;
+        new Invocation(instance).ofField(Short.TYPE, "vp_x1").setAndGet(constant);
     }
 
 
     // instance fields, category 2 primitive get
-    static void VF21() {
+    static void VF2A() {
         assert (double) new Invocation(instance).ofField("vp_x2").get() == 0;
     }
 
     // instance fields, category 2 primitive get-and-set, 2-to-2
-    static void VF22() {
+    static void VF2B() {
         float constant = 1;
         assert (double) new Invocation(instance).ofField("vp_x2").getAndSet(constant) == 0;
     }
 
     // instance fields, category 2 primitive get-and-set, 2-to-1
-    static void VF23() {
+    static void VF2C() {
         float constant = 0;
         assert (int) new Invocation(instance).ofField(double.class, "vp_x2").getAndSet(constant) == 1;
     }
 
     // instance fields, category 2 primitive get-and-set, 2-to-reference
-    static void VF24() {
+    static void VF2D() {
         float constant = 1;
         assert ((Boolean) new Invocation(instance).ofField(Double.TYPE, "vp_x2").getAndSet(constant)).compareTo(Boolean.FALSE) == 0;
     }
 
-    // instance fields, category 2 primitive set
-    static void VF25() {
+    // instance fields, category 2 primitive get-and-set, 2-to-void
+    static void VF2E() {
         float constant = 0;
-        assert new Invocation(instance).ofField(double.class, "vp_x2").set(constant) == constant;
+        new Invocation(instance).ofField(double.class, "vp_x2").getAndSet(constant);
+    }
+
+    // instance fields, category 2 primitive set
+    static void VF2F() {
+        float constant = 1;
+        assert new Invocation(instance).ofField(Double.TYPE, "vp_x2").set(constant) == constant;
     }
 
     // instance fields, category 2 primitive set, void
-    static void VF26() {
-        float constant = 1;
-        new Invocation(instance).ofField(Double.TYPE, "vp_x2").set(constant);
+    static void VF2G() {
+        float constant = 0;
+        new Invocation(instance).ofField(double.class, "vp_x2").set(constant);
     }
 
     // instance fields, category 2 primitive set-and-get
-    static void VF27() {
-        float constant = 0;
+    static void VF2H() {
+        float constant = 1;
         assert (double) new Invocation(instance).ofField("vp_x2").setAndGet(constant) == constant;
+    }
+
+    // instance fields, category 2 primitive set-and-get, void
+    static void VF2I() {
+        float constant = 0;
+        new Invocation(instance).ofField(Double.TYPE, "vp_x2").setAndGet(constant);
     }
 }

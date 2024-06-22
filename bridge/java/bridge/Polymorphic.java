@@ -12,7 +12,7 @@ import static java.lang.annotation.ElementType.TYPE_PARAMETER;
  * @implNote Arguments submitted for parameters annotated by this will have their type determined upon recompilation.
  */
 @Documented
-@Target({ TYPE_PARAMETER, PARAMETER })
+@Target({TYPE_PARAMETER, PARAMETER})
 @interface Polymorphic {
 
 }

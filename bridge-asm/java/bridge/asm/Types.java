@@ -264,6 +264,9 @@ public final class Types {
         } else if (value instanceof KnownType) {
             value = ((KnownType) value).type;
           //break;
+        } else if (value instanceof Class) {
+            value = Type.getType((Class<?>) value);
+          //break;
         }
         if (value instanceof Type) {
             switch (((Type) value).getSort()) {
