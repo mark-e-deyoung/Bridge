@@ -54,10 +54,9 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.6.2</version>
+                <version>${maven.compiler.plugin.version}</version>
                 <configuration>
-                    <source>8</source>
-                    <target>8</target>
+                    <release>${maven.compiler.release}</release>
                     <parameters>true</parameters>
                 </configuration>
             </plugin>

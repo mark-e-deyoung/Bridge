@@ -7,10 +7,29 @@
     <version>-PLACEHOLDER</version>
     <packaging>pom</packaging>
 
+    <properties>
+        <maven.compiler.release>21</maven.compiler.release>
+        <maven.compiler.plugin.version>3.13.0</maven.compiler.plugin.version>
+    </properties>
+
     <modules>
         <module>bridge-asm</module>
         <module>bridge-plugin</module>
         <module>bridge</module>
         <module>bridge-test</module>
     </modules>
+
+    <profiles>
+        <profile>
+            <id>minecraft-it</id>
+            <activation>
+                <property>
+                    <name>minecraft.serverJar</name>
+                </property>
+            </activation>
+            <modules>
+                <module>bridge-mc-it</module>
+            </modules>
+        </profile>
+    </profiles>
 </project>
