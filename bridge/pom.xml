@@ -37,7 +37,7 @@
             <plugin>
                 <groupId>net.ME1312.ASM</groupId>
                 <artifactId>bridge-plugin</artifactId>
-                <version>-PLACEHOLDER</version>
+                <version>${project.version}</version>
                 <executions>
                     <execution>
                         <goals>

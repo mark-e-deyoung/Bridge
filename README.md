@@ -127,7 +127,9 @@ mvn -P minecraft-it -Dminecraft.serverJar=/path/to/server-<version>-mapped.jar t
 The module lives in `bridge-mc-it` and probes `net.minecraft.SharedConstants#getGameVersion().getName()` via `Invocation`. If the signature shifts, the test is skipped with a helpful message.
 
 ## GitHub Packages (Maven/Gradle)
-GitHub Actions now publishes every push to `https://maven.pkg.github.com/<repo-owner>/Bridge` using the built version `0.0.0-<run_number>`. The workflow derives `<repo-owner>` automatically from `github.repository_owner`.
+GitHub Actions publishes artifacts to `https://maven.pkg.github.com/<repo-owner>/Bridge`. It derives `<repo-owner>` automatically from `github.repository_owner`. Versions:
+- Tagged releases: tag `vX.Y.Z` publishes version `X.Y.Z`.
+- Push builds: publish `0.1.0-SNAPSHOT.<run_number>` (useful for CI consumption).
 
 ### Maven consumer snippet
 ```xml
@@ -172,11 +174,14 @@ repositories {
     }
 }
 dependencies {
-    compileOnly("net.ME1312.ASM:bridge:0.0.0-123") // replace with the run number you want
+    // For a tagged release
+    compileOnly("net.ME1312.ASM:bridge:0.1.0")
+    // Or for the latest CI snapshot, use the published run number
+    // compileOnly("net.ME1312.ASM:bridge:0.1.0-SNAPSHOT.<run_number>")
 }
 ```
 
-> Tip: In GitHub Actions, set `BRIDGE_OWNER: ${{ github.repository_owner }}` (it defaults to the current repo’s owner). For consuming from a different repo, override `BRIDGE_OWNER` to the Bridge repo owner.
+> Tip: In GitHub Actions, set `BRIDGE_OWNER: ${{ github.repository_owner }}` (it defaults to the current repo’s owner). For consuming from a different repo, override `BRIDGE_OWNER` to the Bridge repo owner. Use `GITHUB_TOKEN` or a PAT with `packages:read` to authenticate.
 
 ```xml
 <!-- required to access the api -->
