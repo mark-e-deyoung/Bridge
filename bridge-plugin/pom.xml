@@ -47,7 +47,7 @@
         <dependency>
             <groupId>net.ME1312.ASM</groupId>
             <artifactId>bridge-asm</artifactId>
-            <version>${project.version}</version>
+            <version>${bridge.version}</version>
             <scope>compile</scope>
         </dependency>
     </dependencies>

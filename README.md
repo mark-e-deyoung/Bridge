@@ -26,15 +26,15 @@ Bridge is a post-compile maven plugin that injects new advanced functionality in
 
 <repositories>
     <repository>
-        <id>ME1312.net</id>
-        <url>https://dev.me1312.net/maven</url>
+        <id>github</id>
+        <url>https://maven.pkg.github.com/REPO_OWNER/Bridge</url>
     </repository>
 </repositories>
 
 <pluginRepositories>
     <pluginRepository>
-        <id>ME1312.net</id>
-        <url>https://dev.me1312.net/maven</url>
+        <id>github</id>
+        <url>https://maven.pkg.github.com/REPO_OWNER/Bridge</url>
     </pluginRepository>
 </pluginRepositories>
 
@@ -127,7 +127,7 @@ mvn -P minecraft-it -Dminecraft.serverJar=/path/to/server-<version>-mapped.jar t
 The module lives in `bridge-mc-it` and probes `net.minecraft.SharedConstants#getGameVersion().getName()` via `Invocation`. If the signature shifts, the test is skipped with a helpful message.
 
 ## GitHub Packages (Maven/Gradle)
-GitHub Actions publishes artifacts to `https://maven.pkg.github.com/<repo-owner>/Bridge`. It derives `<repo-owner>` automatically from `github.repository_owner`. Versions:
+GitHub Actions publishes artifacts to `https://maven.pkg.github.com/<repo-owner>/Bridge`. For public repositories, packages are public, but GitHub Packages still requires an authenticated request (use `GITHUB_TOKEN` or a PAT with `read:packages`). The workflow derives `<repo-owner>` automatically from `github.repository_owner`. Versions:
 - Tagged releases: tag `vX.Y.Z` publishes version `X.Y.Z`.
 - Push builds: publish `0.1.0-SNAPSHOT.<run_number>` (useful for CI consumption).
 
@@ -136,15 +136,24 @@ GitHub Actions publishes artifacts to `https://maven.pkg.github.com/<repo-owner>
 <repositories>
   <repository>
     <id>github</id>
-    <url>https://maven.pkg.github.com/REPO_OWNER/Bridge</url>
+    <url>https://maven.pkg.github.com/${env.GITHUB_REPOSITORY_OWNER}/Bridge</url>
   </repository>
 </repositories>
 <distributionManagement>
   <repository>
     <id>github</id>
-    <url>https://maven.pkg.github.com/REPO_OWNER/Bridge</url>
+    <url>https://maven.pkg.github.com/${env.GITHUB_REPOSITORY_OWNER}/Bridge</url>
   </repository>
 </distributionManagement>
+```
+And for plugins:
+```xml
+<pluginRepositories>
+  <pluginRepository>
+    <id>github</id>
+    <url>https://maven.pkg.github.com/${env.GITHUB_REPOSITORY_OWNER}/Bridge</url>
+  </pluginRepository>
+</pluginRepositories>
 ```
 Authenticate with a token via `~/.m2/settings.xml`:
 ```xml
@@ -158,10 +167,23 @@ Authenticate with a token via `~/.m2/settings.xml`:
   </servers>
 </settings>
 ```
+If you consume from GitHub Actions, you can omit the settings file and let `actions/setup-java` inject the credentials:
+```yaml
+- uses: actions/setup-java@v4
+  with:
+    distribution: temurin
+    java-version: 21
+    server-id: github
+    server-username: GITHUB_ACTOR
+    server-password: GITHUB_TOKEN
+```
 
 ### Gradle consumer snippet (Kotlin DSL)
 ```kotlin
-val bridgeOwner = providers.environmentVariable("BRIDGE_OWNER").orElse("REPO_OWNER").get()
+val bridgeOwner = providers.environmentVariable("GITHUB_REPOSITORY_OWNER")
+    .orElse(providers.environmentVariable("BRIDGE_OWNER"))
+    .orElse("REPO_OWNER")
+    .get()
 
 repositories {
     mavenCentral()
@@ -169,7 +191,11 @@ repositories {
         url = uri("https://maven.pkg.github.com/$bridgeOwner/Bridge")
         credentials {
             username = providers.environmentVariable("GITHUB_ACTOR").orElse("token").get()
-            password = providers.environmentVariable("GITHUB_TOKEN").orElse("").get()
+            // For public packages, a token is still required; GITHUB_TOKEN or a PAT with read:packages works.
+            password = providers.environmentVariable("GITHUB_TOKEN")
+                .orElse(providers.environmentVariable("GH_TOKEN"))
+                .orElse("")
+                .get()
         }
     }
 }
@@ -181,7 +207,7 @@ dependencies {
 }
 ```
 
-> Tip: In GitHub Actions, set `BRIDGE_OWNER: ${{ github.repository_owner }}` (it defaults to the current repo’s owner). For consuming from a different repo, override `BRIDGE_OWNER` to the Bridge repo owner. Use `GITHUB_TOKEN` or a PAT with `packages:read` to authenticate.
+> Tip: In GitHub Actions, `GITHUB_REPOSITORY_OWNER` is set automatically. If consuming from a different repo owner, set `BRIDGE_OWNER` to override. Use `GITHUB_TOKEN` or a PAT with `packages:read` to authenticate.
 
 ```xml
 <!-- required to access the api -->

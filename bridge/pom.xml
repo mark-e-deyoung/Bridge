@@ -34,13 +34,13 @@
                     <parameters>true</parameters>
                 </configuration>
             </plugin>
-            <plugin>
-                <groupId>net.ME1312.ASM</groupId>
-                <artifactId>bridge-plugin</artifactId>
-                <version>${project.version}</version>
-                <executions>
-                    <execution>
-                        <goals>
+        <plugin>
+            <groupId>net.ME1312.ASM</groupId>
+            <artifactId>bridge-plugin</artifactId>
+            <version>${bridge.version}</version>
+            <executions>
+                <execution>
+                    <goals>
                             <goal>bridge</goal>
                         </goals>
                     </execution>
