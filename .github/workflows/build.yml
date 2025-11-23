@@ -26,7 +26,13 @@ jobs:
 
       - name: Derive version
         id: version
-        run: echo "VALUE=0.0.0-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            VER="${GITHUB_REF_NAME#v}"
+          else
+            VER="0.1.0-SNAPSHOT.${GITHUB_RUN_NUMBER}"
+          fi
+          echo "VALUE=$VER" >> "$GITHUB_OUTPUT"
 
       - name: Set project version
         run: mvn -B -q versions:set -DnewVersion=${{ steps.version.outputs.VALUE }} -DgenerateBackupPoms=false

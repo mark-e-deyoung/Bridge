@@ -4,7 +4,7 @@
 
     <groupId>net.ME1312.ASM</groupId>
     <artifactId>bridge-parent</artifactId>
-    <version>-PLACEHOLDER</version>
+    <version>0.1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <properties>
