@@ -1,6 +1,8 @@
 # Bridge ASM
 [![Build Status](https://dev.me1312.net/jenkins/job/Bridge/badge/icon)](https://dev.me1312.net/jenkins/job/Bridge/)
 [![Build Verison](https://img.shields.io/badge/dynamic/xml.svg?label=build&url=https%3A%2F%2Fdev.me1312.net%2Fmaven%2Fnet%2FME1312%2FASM%2Fbridge-plugin%2Fmaven-metadata.xml&query=%2F%2Fversioning%2Frelease&colorB=blue)](https://dev.me1312.net/jenkins/job/Bridge/)<br><br>
+> Fork note: original work by the ME1312 team; this fork adapts the build and publishing pipeline to run on GitHub services (actions + GitHub Packages).
+
 Bridge is a post-compile maven plugin that injects new advanced functionality into the Java language using existing semantics. Currently, we add the following features:
 * [**Redirection of constructors, methods, &amp; fields**](https://github.com/ME1312/Bridge/wiki/Features#bridges) *with* `@Bridge`
 * [**Unsafe native referencing of classes, constructors, methods, &amp; fields**](https://github.com/ME1312/Bridge/wiki/Features#invocations) *with* `Invocation`
@@ -154,6 +156,8 @@ And for plugins:
     <url>https://maven.pkg.github.com/${env.GITHUB_REPOSITORY_OWNER}/Bridge</url>
   </pluginRepository>
 </pluginRepositories>
+<!-- The plugin repository is required so Maven can resolve net.ME1312.ASM:bridge-plugin
+     from GitHub Packages when executing the bridge goal. -->
 ```
 Authenticate with a token via `~/.m2/settings.xml`:
 ```xml
