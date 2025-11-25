@@ -3,6 +3,11 @@
 [![Build Verison](https://img.shields.io/badge/dynamic/xml.svg?label=build&url=https%3A%2F%2Fdev.me1312.net%2Fmaven%2Fnet%2FME1312%2FASM%2Fbridge-plugin%2Fmaven-metadata.xml&query=%2F%2Fversioning%2Frelease&colorB=blue)](https://dev.me1312.net/jenkins/job/Bridge/)<br><br>
 > Fork note: original work by the ME1312 team; this fork adapts the build and publishing pipeline to run on GitHub services (actions + GitHub Packages).
 
+## GitHub Packages auth (local)
+- You need a PAT with `read:packages` (and `write:packages` if publishing) scoped to this repo’s owner.
+- Export it and log in: `export GH_CONFIG_DIR=$PWD/.gh && printf "%s\n" "$PAT" | gh auth login --with-token`
+- Maven will pick up `GITHUB_TOKEN`/`GH_TOKEN` automatically in CI; locally, set `GITHUB_TOKEN=$PAT` before `mvn deploy` to publish to `https://maven.pkg.github.com/<owner>/Bridge`.
+
 Bridge is a post-compile maven plugin that injects new advanced functionality into the Java language using existing semantics. Currently, we add the following features:
 * [**Redirection of constructors, methods, &amp; fields**](https://github.com/ME1312/Bridge/wiki/Features#bridges) *with* `@Bridge`
 * [**Unsafe native referencing of classes, constructors, methods, &amp; fields**](https://github.com/ME1312/Bridge/wiki/Features#invocations) *with* `Invocation`
