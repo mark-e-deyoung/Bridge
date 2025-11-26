@@ -10,7 +10,7 @@ Thumbs.db
 
 # Build outputs
 **/target/
-/build/
+**/build/
 /out/
 /artifacts/
 /javadoc/
