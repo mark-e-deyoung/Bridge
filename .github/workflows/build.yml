@@ -3,16 +3,20 @@ name: build-and-publish
 on:
   push:
     branches: ["**"]
+  release:
+    types: [published]
 
 permissions:
-  contents: read
+  contents: write
   packages: write
+  pages: write
+  id-token: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
     env:
-        BRIDGE_OWNER: ${{ github.repository_owner }}
+      BRIDGE_OWNER: ${{ github.repository_owner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -55,6 +59,12 @@ jobs:
           -DaltDeploymentRepository=github::default::https://maven.pkg.github.com/${BRIDGE_OWNER}/Bridge
           deploy
 
+      - name: Build static Maven repo for Pages
+        if: github.event_name == 'release'
+        run: |
+          mkdir -p public/maven
+          mvn -B -DskipTests -DaltDeploymentRepository=pages::default::file://${{ github.workspace }}/public/maven deploy
+
       - name: Upload built artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -65,3 +75,38 @@ jobs:
             bridge-asm/target
             bridge-plugin/target
             bridge-test/target
+
+      - name: Attach JARs to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            build/**/bridge-*.jar
+            bridge/target/*.jar
+            bridge-asm/target/*.jar
+            bridge-plugin/target/*.jar
+            bridge-test/target/*.jar
+
+      - name: Upload Pages artifact
+        if: github.event_name == 'release'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy-pages:
+    if: github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: true
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

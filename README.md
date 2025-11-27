@@ -138,6 +138,23 @@ GitHub Actions publishes artifacts to `https://maven.pkg.github.com/<repo-owner>
 - Tagged releases: tag `vX.Y.Z` publishes version `X.Y.Z`.
 - Push builds: publish `0.1.0-SNAPSHOT.<run_number>` (useful for CI consumption).
 
+### Anonymous Maven mirror (GitHub Pages)
+Each published release also pushes a static Maven repo to GitHub Pages at `https://<repo-owner>.github.io/Bridge/maven` so consumers can resolve without authentication (use released versions, not snapshots). Add it as a repository for dependencies and plugins:
+```xml
+<repositories>
+  <repository>
+    <id>bridge-public</id>
+    <url>https://REPO_OWNER.github.io/Bridge/maven</url>
+  </repository>
+</repositories>
+<pluginRepositories>
+  <pluginRepository>
+    <id>bridge-public</id>
+    <url>https://REPO_OWNER.github.io/Bridge/maven</url>
+  </pluginRepository>
+</pluginRepositories>
+```
+
 ### Maven consumer snippet
 ```xml
 <repositories>
