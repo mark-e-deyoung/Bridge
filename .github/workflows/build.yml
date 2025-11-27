@@ -7,6 +7,10 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Tag to publish (for manual runs)"
+        required: false
 
 permissions:
   contents: write
@@ -40,7 +44,9 @@ jobs:
       - name: Derive version
         id: version
         run: |
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+          if [[ -n "${{ inputs.release_tag }}" ]]; then
+            VER="${{ inputs.release_tag#v }}"
+          elif [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             VER="${GITHUB_REF_NAME#v}"
           else
             VER="0.1.0-SNAPSHOT.${GITHUB_RUN_NUMBER}"
@@ -62,7 +68,7 @@ jobs:
           deploy
 
       - name: Build static Maven repo for Pages
-        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
         run: |
           rm -rf docs/maven
           mkdir -p docs/maven
@@ -80,9 +86,10 @@ jobs:
             bridge-test/target
 
       - name: Attach JARs to release
-        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
           files: |
             build/**/bridge-*.jar
             bridge/target/*.jar
@@ -91,13 +98,13 @@ jobs:
             bridge-test/target/*.jar
 
       - name: Upload Pages artifact
-        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
         uses: actions/upload-pages-artifact@v3
         with:
           path: docs
 
   deploy-pages:
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
     needs: build
     runs-on: ubuntu-latest
     permissions:
