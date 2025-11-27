@@ -62,8 +62,9 @@ jobs:
       - name: Build static Maven repo for Pages
         if: github.event_name == 'release'
         run: |
-          mkdir -p public/maven
-          mvn -B -DskipTests -DaltDeploymentRepository=pages::default::file://${{ github.workspace }}/public/maven deploy
+          rm -rf docs/maven
+          mkdir -p docs/maven
+          mvn -B -DskipTests -DaltDeploymentRepository=pages::default::file://${{ github.workspace }}/docs/maven deploy
 
       - name: Upload built artifacts
         uses: actions/upload-artifact@v4
@@ -91,7 +92,7 @@ jobs:
         if: github.event_name == 'release'
         uses: actions/upload-pages-artifact@v3
         with:
-          path: public
+          path: docs
 
   deploy-pages:
     if: github.event_name == 'release'
